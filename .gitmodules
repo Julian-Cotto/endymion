@@ -1,0 +1,12 @@
+[submodule "app-platform-feature-scaffold-tool"]
+	path = app-platform-feature-scaffold-tool
+	url = github.com-work:highland-ventures/app-platform-feature-scaffold-tool.git
+[submodule "app-platform-registry-service"]
+	path = app-platform-registry-service
+	url = github.com-work:highland-ventures/app-platform-registry-service.git
+[submodule "app-platform-shell"]
+	path = app-platform-shell
+	url = github.com-work:highland-ventures/app-platform-shell.git
+[submodule "app-platform-shell-bootstrap-api"]
+	path = app-platform-shell-bootstrap-api
+	url = github.com-work:highland-ventures/app-platform-shell-bootstrap-api.git

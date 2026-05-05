@@ -1,0 +1,1 @@
+export const featureRoutes = [{ path: "/inventory/it", label: "IT Asset Inventory" }];

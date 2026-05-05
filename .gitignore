@@ -1,0 +1,56 @@
+# =====================================================================
+# Top-level ignore. Each submodule has its own .gitignore — these rules
+# also apply when working in the inventory plain-directory repos.
+# =====================================================================
+
+# --- runtime artifacts / logs ---
+logs/
+*.log
+*.pid
+
+# --- python ---
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- node / vite ---
+node_modules/
+.npm/
+.pnpm-store/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# --- env / secrets (per-machine) ---
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# --- local databases / data ---
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- ngrok / tunnels ---
+ngrok.yml
+.ngrok/
+
+# --- editor / OS ---
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
