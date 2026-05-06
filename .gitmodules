@@ -10,3 +10,9 @@
 [submodule "app-platform-shell-bootstrap-api"]
 	path = app-platform-shell-bootstrap-api
 	url = github.com-work:highland-ventures/app-platform-shell-bootstrap-api.git
+[submodule "feature-asset-inventory-backend"]
+	path = feature-asset-inventory-backend
+	url = github.com-work:Julian-Cotto/feature-asset-inventory-backend.git
+[submodule "feature-asset-inventory-frontend"]
+	path = feature-asset-inventory-frontend
+	url = github.com-work:Julian-Cotto/feature-asset-inventory-frontend.git
