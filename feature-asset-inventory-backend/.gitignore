@@ -45,6 +45,21 @@ coverage/
 # Logs
 # -----------------------------
 *.log
+logs/
+
+# -----------------------------
+# Local SQLite stub / runtime data
+# -----------------------------
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# -----------------------------
+# Lint / type-check caches
+# -----------------------------
+.mypy_cache/
+.ruff_cache/
 
 # -----------------------------
 # Testing / coverage
