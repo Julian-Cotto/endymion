@@ -175,15 +175,18 @@ multiplex_logs() {
 
 parse_common_args() {
   BOOTSTRAP=1
+  WITH_DB=0
   SKIP=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --no-bootstrap) BOOTSTRAP=0; shift ;;
+      --with-db)      WITH_DB=1; shift ;;
       --skip) SKIP="$2"; shift 2 ;;
       -h|--help)
         cat <<EOF
-Usage: $(basename "$0") [--no-bootstrap] [--skip name1,name2]
+Usage: $(basename "$0") [--no-bootstrap] [--with-db] [--skip name1,name2]
   --no-bootstrap   skip pip install / npm install
+  --with-db        start docker-compose DBs before services that need them
   --skip <list>    omit specific services (comma-separated)
 Services: ${SVC_NAMES[*]:-}
 EOF
@@ -200,4 +203,22 @@ EOF
     done
     SVC_NAMES=("${kept[@]}")
   fi
+}
+
+has_service() {
+  local target="$1"
+  for n in "${SVC_NAMES[@]}"; do
+    [[ "$n" == "$target" ]] && return 0
+  done
+  return 1
+}
+
+require_tcp() {
+  local host="$1" port="$2" hint="${3:-}"
+  if (echo > "/dev/tcp/$host/$port") 2>/dev/null; then
+    return 0
+  fi
+  echo "[run] ERROR: TCP $host:$port unreachable" >&2
+  [[ -n "$hint" ]] && echo "[run]   $hint" >&2
+  return 1
 }

@@ -27,7 +27,7 @@ SVC_NAMES=(registry bootstrap shell inv-api inv-web)
 declare -A SVC_DIR SVC_CMD SVC_HEALTH SVC_HEALTH_TIMEOUT SVC_BOOTSTRAP SVC_ENV_FROM_EXAMPLE
 
 SVC_DIR[registry]="$ROOT/app-platform-registry-service"
-SVC_CMD[registry]='PYTHONPATH=. .venv/bin/alembic upgrade head 2>&1; PYTHONPATH=. .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8010'
+SVC_CMD[registry]='PYTHONPATH=. .venv/bin/alembic upgrade head && PYTHONPATH=. .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8010'
 SVC_HEALTH[registry]="http://localhost:8010/health"
 SVC_HEALTH_TIMEOUT[registry]=60
 SVC_BOOTSTRAP[registry]="python"
@@ -63,6 +63,16 @@ PORTS=(8010 8000 3000 8200 3200)
 
 source "$ROOT/scripts/_run_lib.sh"
 parse_common_args "$@"
+
+if has_service registry; then
+  if [[ "$WITH_DB" == "1" ]]; then
+    "$ROOT/scripts/start_db.sh" || exit 1
+  fi
+  require_tcp localhost 5433 \
+    "Start with: ./scripts/start_db.sh  (or pass --with-db)  (or --skip registry)" \
+    || exit 1
+fi
+
 clear_ports "${PORTS[@]}"
 launch_services
 multiplex_logs
