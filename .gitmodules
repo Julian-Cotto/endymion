@@ -16,3 +16,9 @@
 [submodule "feature-asset-inventory-frontend"]
 	path = feature-asset-inventory-frontend
 	url = github.com-work:Julian-Cotto/feature-asset-inventory-frontend.git
+[submodule "feature-continued-education-backend"]
+	path = feature-continued-education-backend
+	url = github.com-work:Julian-Cotto/feature-continued-education-backend.git
+[submodule "feature-continued-education-frontend"]
+	path = feature-continued-education-frontend
+	url = github.com-work:Julian-Cotto/feature-continued-education-frontend.git
