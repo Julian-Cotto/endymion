@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Launch ALL services (platform + inventory feature) in one terminal.
+# Launch ALL services (platform + feature) in one terminal.
 # Order:
 #   1. registry            :8010
 #   2. shell-bootstrap-api :8000
 #   3. shell               :3000
 #   4. inv-api             :8200
 #   5. inv-web             :3200
+#   6. ce-api              :8300
+#   7. ce-web              :3300
 #
-# For development you usually want two terminals instead:
+# For development you usually want separate terminals instead:
 #   T1: ./run_platform.sh
 #   T2: ./run_inventory.sh
-# That way the inv-api/web restarts don't tear down the shell.
+#   T3: ./run_continued_ed.sh
+# That way feature restarts don't tear down the shell.
 #
 # Usage:
 #   ./run_all.sh                       # full launch + bootstrap deps
@@ -23,7 +26,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
 
-SVC_NAMES=(registry bootstrap shell inv-api inv-web)
+SVC_NAMES=(registry bootstrap shell inv-api inv-web ce-api ce-web)
 declare -A SVC_DIR SVC_CMD SVC_HEALTH SVC_HEALTH_TIMEOUT SVC_BOOTSTRAP SVC_ENV_FROM_EXAMPLE
 
 SVC_DIR[registry]="$ROOT/app-platform-registry-service"
@@ -59,7 +62,19 @@ SVC_HEALTH[inv-web]="http://localhost:3200/"
 SVC_HEALTH_TIMEOUT[inv-web]=60
 SVC_BOOTSTRAP[inv-web]="node"
 
-PORTS=(8010 8000 3000 8200 3200)
+SVC_DIR[ce-api]="$ROOT/feature-continued-education-backend"
+SVC_CMD[ce-api]='AUTH_MODE=mock APP_ENVIRONMENT=local .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8300'
+SVC_HEALTH[ce-api]="http://localhost:8300/api/education/continued-ed/health"
+SVC_HEALTH_TIMEOUT[ce-api]=30
+SVC_BOOTSTRAP[ce-api]="python"
+
+SVC_DIR[ce-web]="$ROOT/feature-continued-education-frontend"
+SVC_CMD[ce-web]='npm run dev'
+SVC_HEALTH[ce-web]="http://localhost:3300/"
+SVC_HEALTH_TIMEOUT[ce-web]=60
+SVC_BOOTSTRAP[ce-web]="node"
+
+PORTS=(8010 8000 3000 8200 3200 8300 3300)
 
 source "$ROOT/scripts/_run_lib.sh"
 parse_common_args "$@"
