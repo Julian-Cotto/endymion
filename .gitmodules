@@ -22,3 +22,6 @@
 [submodule "feature-continued-education-frontend"]
 	path = feature-continued-education-frontend
 	url = github.com-work:Julian-Cotto/feature-continued-education-frontend.git
+[submodule "app-platform-snowflake-client"]
+	path = app-platform-snowflake-client
+	url = github.com-work:Julian-Cotto/endymion-snowflake-client.git
