@@ -1,0 +1,60 @@
+{
+  "environment": "local",
+  "user": {
+    "id": "local-dev",
+    "displayName": "Local Developer",
+    "email": "dev@local"
+  },
+  "permissions": [
+    "reports-layering.view"
+  ],
+  "flags": {},
+  "features": [
+    {
+      "featureKey": "reports-layering",
+      "displayName": "Reports Layering",
+      "route": "/reports",
+      "version": "local",
+      "nav": {
+        "label": "Reports Layering",
+        "icon": "box",
+        "group": null,
+        "order": null
+      },
+      "frontend": {
+        "enabled": true,
+        "entryStrategy": "vite-dynamic-import",
+        "entryUrl": "http://localhost:3200/src/bootstrap-entry.tsx",
+        "mountFunction": "mount"
+      },
+      "backend": {
+        "enabled": true,
+        "apiBaseUrl": "http://localhost:8100/api/reports",
+        "healthEndpoint": "/health"
+      },
+      "authorization": {
+        "requiredPermissions": [
+          "reports-layering.view"
+        ],
+        "requiredFlags": [
+          "reports-layering.enabled"
+        ]
+      },
+      "auth": {
+        "mode": "shell-provided",
+        "required": true,
+        "shellAuthRequired": true,
+        "tokenForwarding": true,
+        "allowedDevModes": [
+          "mock"
+        ],
+        "roles": []
+      }
+    }
+  ],
+  "metadata": {
+    "source": "bootstrap-service-registry",
+    "generatedBy": "shell-bootstrap-api",
+    "generatedAtUtc": "2026-05-04T00:00:00Z"
+  }
+}

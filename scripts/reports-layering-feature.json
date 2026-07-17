@@ -1,0 +1,102 @@
+{
+  "feature_name": "reports-layering",
+  "display_name": "Reports Layering",
+  "description": "Reporting layer app: BAs upload report definitions (parameterized SQL + JSON metadata) against Snowflake tables; users browse slug-routed reports filtered by app-managed group access. Consistent renderer (tables, charts, KPI cards, CSV/PDF export). Data served from scheduled cached snapshots.",
+  "base_path": "/reports",
+  "frontend": {
+    "enabled": true,
+    "framework": "react-vite",
+    "shell_integration": true
+  },
+  "backend": {
+    "enabled": true,
+    "framework": "fastapi",
+    "api_base_path": "/api/reports"
+  },
+  "auth": {
+    "mode": "entra",
+    "shell_auth_required": true,
+    "token_forwarding": true,
+    "allowed_dev_modes": ["mock"],
+    "roles": ["reports-admin", "reports-author", "reports-viewer"],
+    "backend_token_strategy": "forwarded-bearer"
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest",
+    "manifest_publish": true
+  },
+  "capabilities": {
+    "database": {
+      "enabled": true,
+      "targets": ["api", "jobs"],
+      "providers": {
+        "postgresql": { "enabled": true, "orm": true, "migrations": true },
+        "snowflake": { "enabled": true }
+      }
+    },
+    "blob_storage": { "enabled": false, "provider": "azure_blob", "targets": [] },
+    "cache": {
+      "enabled": true,
+      "targets": ["api"],
+      "providers": {
+        "memory": { "enabled": true },
+        "redis": { "enabled": false }
+      }
+    }
+  },
+  "scheduled_jobs": [
+    {
+      "name": "refresh-report-snapshots",
+      "description": "Execute each active report definition's SQL against Snowflake and write a fresh cached snapshot row set to Postgres.",
+      "schedule": "0 * * * *",
+      "entrypoint": "jobs.refresh_snapshots:main"
+    }
+  ],
+  "event_driven_jobs": [
+    {
+      "name": "snapshot-on-publish",
+      "description": "When a report is created or its definition changes, run an immediate snapshot refresh instead of waiting for the schedule.",
+      "trigger": {
+        "kind": "topic-subscription",
+        "topic": "reports-layering",
+        "subscription": "snapshot-on-publish"
+      },
+      "payload_schema": "ReportDefinitionPublished",
+      "dead_letter": true,
+      "max_concurrency": 2,
+      "retry_policy": { "max_retries": 3, "backoff": "exponential" }
+    }
+  ],
+  "event_listeners": [],
+  "events": {
+    "publishes": [
+      { "name": "reports-layering.report-published", "schema": "ReportDefinitionPublished" },
+      { "name": "reports-layering.snapshot-refreshed", "schema": "SnapshotRefreshed" }
+    ],
+    "consumes": []
+  },
+  "deployment": {
+    "api": {
+      "enabled": true,
+      "runtime": "container-app",
+      "container_app_name": "reports-layering-api",
+      "port": 8500
+    },
+    "jobs": [
+      {
+        "name": "reports-layering-jobs",
+        "enabled": true,
+        "runtime": "container-app-job",
+        "container_app_name": "reports-layering-jobs",
+        "trigger_type": "schedule"
+      }
+    ],
+    "listeners": []
+  },
+  "developer_experience": {
+    "include_docs": true,
+    "include_tests": true,
+    "include_scripts": true
+  }
+}

@@ -28,18 +28,33 @@ front/back-ends. Each sub-project is a Git submodule (except
 | Continued Education — Web | [feature-continued-education-frontend/](feature-continued-education-frontend/) | Node (Vite + React) | 3300 |
 | Document Compliance — API | [document-compliance-backend/](document-compliance-backend/) | Python (FastAPI, Postgres) | 8400 |
 | Document Compliance — Web | [document-compliance-frontend/](document-compliance-frontend/) | Node (Vite + React) | 3400 |
+| Reports Layering — API | [feature-reports-layering/backend/](feature-reports-layering/backend/) | Python (FastAPI, SQLite/Postgres + Snowflake) | 8500 |
+| Reports Layering — Web | [feature-reports-layering/frontend/](feature-reports-layering/frontend/) | Node (Vite + React) | 3500 |
+| Lead Locator — API | [feature-lead-locator/backend/](feature-lead-locator/backend/) | Python (FastAPI, PostGIS) | 8600 |
+| Lead Locator — Web | [feature-lead-locator/frontend/](feature-lead-locator/frontend/) | Node (Vite + React + MapLibre) | 3600 |
 | Snowflake client (shared) | [app-platform-snowflake-client/](app-platform-snowflake-client/) | Python library | — |
 | Feature scaffold tool | [app-platform-feature-scaffold-tool/](app-platform-feature-scaffold-tool/) | Python CLI | — |
 
-Two Postgres databases run in Docker:
+Three Postgres databases run in Docker:
 
 | DB | Image | Port | Used by |
 |---|---|---|---|
 | `portal_registry` | postgres:16 | 5433 | registry service |
 | `document_compliance` | postgres:16 | 5434 | document compliance API |
+| `lead_locator` | postgis/postgis:16-3.4 | 5435 | lead locator API |
 
 The Asset Inventory API uses **SQLite on disk** (default
 `app-platform.db` next to the service). No external DB needed.
+
+The Reports Layering API also uses **SQLite on disk** locally (default
+`reports_layering.db` next to the backend, auto-migrated on start) and runs
+Snowflake in **mock mode** without creds — so `./run_reports.sh` needs no
+Docker. Point `DATABASE_URL` at Postgres for a production-shaped run.
+
+The Lead Locator API is the one feature with **no zero-service local mode**:
+it needs **PostGIS** (not plain Postgres) because scoring stores POI and
+census-tract geometry and runs distance/containment queries.
+`./run_leads.sh` starts that container for you (`--no-db` to skip).
 
 ---
 
@@ -170,6 +185,8 @@ to `.env` and edit the few required values. Frontends use Vite's
 | [`feature-continued-education-frontend/.env`](feature-continued-education-frontend/.env) | copy from `.env.example` | `VITE_API_BASE_URL=http://localhost:8300/api/education/continued-ed`, `VITE_AUTH_MODE=mock` | |
 | [`document-compliance-backend/.env`](document-compliance-backend/.env) | copy from `.env.example` | `APP_ENVIRONMENT=local`, `AUTH_MODE=mock`, `DATABASE_URL=postgresql://compliance:compliance@localhost:5434/document_compliance`, `DB_CREATE_ALL_ON_STARTUP=true` | The Postgres `:5434` must be up (`./scripts/start_db.sh` or its own compose file). |
 | [`document-compliance-frontend/.env`](document-compliance-frontend/.env) | copy from `.env.example` | `VITE_API_BASE_URL=http://localhost:8400/api/document-compliance`, `VITE_AUTH_MODE=mock` | |
+| [`feature-lead-locator/backend/.env`](feature-lead-locator/backend/.env) | copy from `.env.example` | `APP_ENVIRONMENT=local`, `AUTH_MODE=mock`, `DATABASE_URL=postgresql://leads:leads@localhost:5435/lead_locator` | Needs **PostGIS** on `:5435` (`./run_leads.sh` starts it, or its own compose file). Defaults in the example work for local dev. |
+| [`feature-lead-locator/frontend/.env`](feature-lead-locator/frontend/.env) | copy from `.env.example` | `VITE_API_BASE_URL=http://localhost:8600/api/leads`, `VITE_AUTH_MODE=mock` | |
 
 ### 4.2. Auth modes
 
@@ -250,6 +267,7 @@ That script wraps `docker compose up -d` for the two compose files at:
 
 - [`app-platform-registry-service/docker-compose.yml`](app-platform-registry-service/docker-compose.yml) → `portal_registry` on **:5433**
 - [`document-compliance-backend/docker-compose.yml`](document-compliance-backend/docker-compose.yml) → `document_compliance` on **:5434**
+- [`feature-lead-locator/docker-compose.yml`](feature-lead-locator/docker-compose.yml) → `lead_locator` (PostGIS) on **:5435** — not started by `start_db.sh`; `./run_leads.sh` brings it up on its own.
 
 Verify both are listening:
 
@@ -350,8 +368,13 @@ feature MFEs from their dev servers via the bootstrap API.
 | Continued Ed Web | 3300 | http://localhost:3300/ |
 | Doc Compliance API | 8400 | http://localhost:8400/api/document-compliance/health |
 | Doc Compliance Web | 3400 | http://localhost:3400/ |
+| Reports Layering API | 8500 | http://localhost:8500/api/reports/health |
+| Reports Layering Web | 3500 | http://localhost:3500/ |
+| Lead Locator API | 8600 | http://localhost:8600/api/leads/health |
+| Lead Locator Web | 3600 | http://localhost:3600/ |
 | Registry DB (Postgres) | 5433 | `psql -h localhost -p 5433 -U registry portal_registry` |
 | Doc Compliance DB (Postgres) | 5434 | `psql -h localhost -p 5434 -U compliance document_compliance` |
+| Lead Locator DB (PostGIS) | 5435 | `psql -h localhost -p 5435 -U leads lead_locator` |
 
 ---
 

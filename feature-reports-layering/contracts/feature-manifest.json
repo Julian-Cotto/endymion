@@ -1,0 +1,83 @@
+{
+  "manifestVersion": "1.0",
+  "featureKey": "reports-layering",
+  "displayName": "Reports Layering",
+  "description": "Reporting layer app: BAs upload report definitions (parameterized SQL + JSON metadata) against Snowflake tables; users browse slug-routed reports filtered by app-managed group access. Consistent renderer (tables, charts, KPI cards, CSV/PDF export). Data served from scheduled cached snapshots.",
+  "basePath": "/reports",
+  "route": "/reports",
+  "navigation": {
+    "label": "Reports Layering",
+    "icon": "package"
+  },
+  "nav": {
+    "label": "Reports Layering",
+    "icon": "package",
+    "group": null,
+    "order": 0
+  },
+  "version": "0.1.0",
+  "frontend": {
+    "enabled": true,
+    "type": "module",
+    "entryStrategy": "vite-dynamic-import",
+    "entryUrl": "/features/reports-layering/assets/bootstrap.js",
+    "mountFunction": "mount",
+    "integrity": null,
+    "basePath": "/reports"
+  },
+  "backend": {
+    "enabled": true,
+    "baseUrl": "/api/reports",
+    "apiBaseUrl": "/api/reports",
+    "healthEndpoint": "/api/reports/health"
+  },
+  "authorization": {
+    "requiredPermissions": [
+      "reports-layering.view"
+    ],
+    "requiredFlags": [
+      "reports-layering.enabled"
+    ]
+  },
+  "auth": {
+    "required": true,
+    "mode": "entra",
+    "shellAuthRequired": true,
+    "tokenForwarding": true,
+    "tokenStrategy": "forwarded-bearer",
+    "allowedDevModes": [
+      "mock"
+    ],
+    "roles": []
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest"
+  },
+  "compatibility": {
+    "shellContractMin": null,
+    "shellContractMax": null
+  },
+  "metadata": {
+    "ownerTeam": "platform",
+    "commitSha": null,
+    "buildId": null,
+    "releaseDate": null
+  },
+  "events": {
+    "publishes": [
+      "reports-layering.report-published",
+      "reports-layering.snapshot-refreshed"
+    ],
+    "consumes": []
+  },
+  "workers": {
+    "scheduledJobs": [
+      "refresh-report-snapshots"
+    ],
+    "eventDrivenJobs": [
+      "snapshot-on-publish"
+    ],
+    "eventListeners": []
+  }
+}

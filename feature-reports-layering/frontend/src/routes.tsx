@@ -1,0 +1,1 @@
+export const featureRoutes = [{ path: "/reports", label: "Reports Layering" }];

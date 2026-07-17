@@ -1,0 +1,43 @@
+{
+  "environment": "local",
+  "user": {
+    "id": "local-dev",
+    "displayName": "Local Developer",
+    "email": "dev@local"
+  },
+  "permissions": [
+    "reports-layering.view"
+  ],
+  "flags": {
+    "shell.debug": true,
+    "reports-layering.enabled": true
+  },
+  "features": [
+    {
+      "featureKey": "reports-layering",
+      "displayName": "Reports Layering",
+      "route": "/reports",
+      "version": "local",
+      "nav": {
+        "label": "Reports Layering",
+        "icon": "box",
+        "group": null,
+        "order": null
+      },
+      "frontend": {
+        "entryUrl": "http://localhost:3200/src/bootstrap-entry.tsx"
+      },
+      "backend": {
+        "apiBaseUrl": "http://localhost:8100/api/reports"
+      },
+      "authorization": {
+        "requiredPermissions": [
+          "reports-layering.view"
+        ],
+        "requiredFlags": [
+          "reports-layering.enabled"
+        ]
+      }
+    }
+  ]
+}

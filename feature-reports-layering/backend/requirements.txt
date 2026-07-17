@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+httpx
+PyJWT[crypto]
+jsonschema>=4.22.0
+
+sqlalchemy
+psycopg2-binary
+alembic
+
+-e ../../app-platform-snowflake-client[snowflake]
+
+

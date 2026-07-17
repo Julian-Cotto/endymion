@@ -1,0 +1,17 @@
+{
+  "name": "Reports Layering",
+  "short_name": "Reports",
+  "description": "Reporting layer — browse, view, and drill into Snowflake-backed reports.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0c0e18",
+  "theme_color": "#0c0e18",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230c0e18'/%3E%3Crect x='48' y='96' width='20' height='48' rx='4' fill='%232f6bff'/%3E%3Crect x='86' y='72' width='20' height='72' rx='4' fill='%235e8bff'/%3E%3Crect x='124' y='52' width='20' height='92' rx='4' fill='%2314e0c4'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
