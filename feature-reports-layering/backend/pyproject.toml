@@ -13,6 +13,9 @@ dependencies = [
   "psycopg2-binary",
   "alembic",
   "platform-snowflake-client",
+  "python-multipart",
+  "pandas",
+  "openpyxl",
 ]
 
 [project.optional-dependencies]

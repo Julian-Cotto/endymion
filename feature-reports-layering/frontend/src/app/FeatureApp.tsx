@@ -5,6 +5,7 @@ import { BrowseView } from "../views/BrowseView";
 import { DashboardView } from "../views/DashboardView";
 import { ReportView } from "../views/ReportView";
 import { UploadView } from "../views/UploadView";
+import { HelpView } from "../views/HelpView";
 import { useFeatureAuth } from "../platform/authProvider";
 import { ToastProvider } from "../components/Toast";
 
@@ -63,6 +64,14 @@ export function FeatureApp({
                   Upload
                 </button>
               )}
+              {canAuthor && (
+                <button
+                  className={route.view === "help" ? "is-active" : ""}
+                  onClick={() => navigate({ view: "help" })}
+                >
+                  Guide
+                </button>
+              )}
             </nav>
           </header>
 
@@ -80,6 +89,7 @@ export function FeatureApp({
                   You don't have permission to edit reports.
                 </p>
               ))}
+            {route.view === "help" && <HelpView />}
           </main>
         </div>
       </div>

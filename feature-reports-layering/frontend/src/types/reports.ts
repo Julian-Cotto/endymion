@@ -24,6 +24,56 @@ export interface ChartConfig {
   agg?: "sum" | "avg"; // how to combine rows sharing an x value (default sum)
 }
 
+export type ParamType = "string" | "int" | "float" | "bool" | "date";
+
+export interface ParamSpec {
+  type?: ParamType;
+  label?: string;
+  default?: unknown;
+  required?: boolean;
+}
+
+export type SourceType = "sql" | "file";
+export type JoinHow = "inner" | "left";
+
+export interface SourceInput {
+  name: string;
+  type: SourceType;
+  sql?: string | null; // for type "sql"
+  file_ref?: string | null; // for type "file"
+  params?: Record<string, unknown>;
+  sort_order?: number;
+}
+
+export interface JoinInput {
+  left: string; // source name
+  right: string; // source name
+  on: Array<[string, string]>; // [left_col, right_col] pairs
+  how?: JoinHow;
+}
+
+export interface CombineSpec {
+  op: "join" | "union";
+  joins?: JoinInput[];
+  distinct?: boolean; // union only
+}
+
+/** Result of POST /uploads — a stored dataset ready to reference from a source. */
+export interface UploadedDataset {
+  file_ref: string;
+  filename: string;
+  row_count: number;
+  columns: Record<string, { label?: string; format?: string }>;
+  sample_rows: Array<Record<string, unknown>>;
+}
+
+/** Result of POST /definitions/preview — dry-run columns + sample rows. */
+export interface PreviewResult {
+  result_columns: string[];
+  rows: Array<Record<string, unknown>>;
+  row_count: number;
+}
+
 export type BlockType = "kpi" | "chart" | "table" | "note";
 
 export interface LayoutBlock {
@@ -65,7 +115,9 @@ export interface ReportDefinitionInput {
   title: string;
   description?: string;
   slug?: string;
-  sql_text: string;
+  sql_text?: string; // legacy single source; omit/empty when using `sources`
+  sources?: SourceInput[];
+  combine?: CombineSpec | null;
   params?: Record<string, unknown>;
   columns?: Record<string, ColumnConfig>;
   chart?: ChartConfig | null;
@@ -75,9 +127,21 @@ export interface ReportDefinitionInput {
   status?: "active" | "draft" | "archived";
 }
 
+export interface SourceOut {
+  name: string;
+  source_type: SourceType;
+  sql_text: string | null;
+  file_ref: string | null;
+  params: Record<string, unknown>;
+  sort_order: number;
+}
+
 export interface ReportDefinition extends ReportDefinitionInput {
   id: number;
   slug: string;
+  sql_text?: string; // nullable server-side; empty string when source-based
+  sources: SourceOut[];
+  combine: CombineSpec | null;
   version: number;
   created_by: string | null;
   created_at: string;

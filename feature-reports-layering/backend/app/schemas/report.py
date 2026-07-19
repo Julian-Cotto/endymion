@@ -3,11 +3,13 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 OutputType = Literal["table", "chart", "kpi"]
 ParamType = Literal["string", "int", "float", "bool", "date"]
 ChartType = Literal["bar", "line", "pie", "area"]
+SourceType = Literal["sql", "file"]
+JoinHow = Literal["inner", "left"]
 
 
 class ParamSpec(BaseModel):
@@ -23,6 +25,12 @@ class ColumnConfig(BaseModel):
     format: str | None = None
     align: Literal["left", "right", "center"] | None = None
     hidden: bool = False
+    # ---- enterprise renderer hints (all optional) ----
+    agg: Literal["sum", "avg", "min", "max", "count"] | None = None  # summary-strip aggregate
+    bar: bool | None = None  # inline magnitude bar
+    heat: bool | Literal["reverse"] | None = None  # traffic-light color scale
+    style: Literal["badge"] | None = None  # render values as colored pills
+    group: str | None = None  # column-group band label
 
 
 class ChartConfig(BaseModel):
@@ -45,13 +53,65 @@ class LayoutBlock(BaseModel):
     text: str | None = None  # used when type == "note"
 
 
+class SourceSpec(BaseModel):
+    """One input feeding a report: a SQL query or an uploaded file dataset."""
+
+    name: str = Field(min_length=1, max_length=160)
+    type: SourceType = "sql"
+    # Read-only SELECT for type == "sql" (validated by sql_guard in the service).
+    sql: str | None = None
+    # Handle to a stored uploaded dataset for type == "file".
+    file_ref: str | None = None
+    params: dict[str, ParamSpec] = Field(default_factory=dict)
+    sort_order: int = 0
+
+    @model_validator(mode="after")
+    def _check_shape(self) -> "SourceSpec":
+        if self.type == "sql" and not (self.sql and self.sql.strip()):
+            raise ValueError(f"Source '{self.name}': sql is required for a SQL source.")
+        if self.type == "file" and not self.file_ref:
+            raise ValueError(f"Source '{self.name}': file_ref is required for a file source.")
+        return self
+
+
+class JoinSpec(BaseModel):
+    """Join two named sources on one or more (left_col, right_col) key pairs."""
+
+    left: str = Field(min_length=1)
+    right: str = Field(min_length=1)
+    on: list[tuple[str, str]] = Field(min_length=1)
+    how: JoinHow = "inner"
+
+
+class CombineSpec(BaseModel):
+    """How to blend a report's sources into one result set."""
+
+    op: Literal["join", "union"]
+    joins: list[JoinSpec] = Field(default_factory=list)
+    # union only: drop fully-duplicate rows after concatenation.
+    distinct: bool = False
+
+    @model_validator(mode="after")
+    def _check_join_rules(self) -> "CombineSpec":
+        if self.op == "join" and not self.joins:
+            raise ValueError("combine.op 'join' requires at least one entry in joins.")
+        return self
+
+
 class ReportDefinitionIn(BaseModel):
-    """The payload a BA uploads. `slug` is derived from title if omitted."""
+    """The payload a BA uploads. `slug` is derived from title if omitted.
+
+    A report gets its data one of two ways:
+      * legacy single source: `sql_text` (no `sources`), or
+      * one or more `sources` blended per `combine`.
+    """
 
     title: str = Field(min_length=1, max_length=200)
     description: str = ""
     slug: str | None = Field(default=None, max_length=160)
-    sql: str = Field(min_length=1, alias="sql_text")
+    sql: str = Field(default="", alias="sql_text")
+    sources: list[SourceSpec] = Field(default_factory=list)
+    combine: CombineSpec | None = None
     params: dict[str, ParamSpec] = Field(default_factory=dict)
     columns: dict[str, ColumnConfig] = Field(default_factory=dict)
     chart: ChartConfig | None = None
@@ -67,13 +127,49 @@ class ReportDefinitionIn(BaseModel):
     def _non_empty_outputs(cls, v: list[str]) -> list[str]:
         return v or ["table"]
 
+    @model_validator(mode="after")
+    def _check_data_source(self) -> "ReportDefinitionIn":
+        has_sql = bool(self.sql and self.sql.strip())
+        if self.sources:
+            if has_sql:
+                raise ValueError("Provide either sql_text or sources, not both.")
+            names = [s.name for s in self.sources]
+            if len(names) != len(set(names)):
+                raise ValueError("Source names must be unique within a report.")
+            if len(self.sources) > 1 and self.combine is None:
+                raise ValueError("combine is required when a report has multiple sources.")
+            if self.combine is not None:
+                known = set(names)
+                for j in self.combine.joins:
+                    missing = {j.left, j.right} - known
+                    if missing:
+                        raise ValueError(
+                            f"combine references unknown source(s): {', '.join(sorted(missing))}."
+                        )
+        elif not has_sql:
+            raise ValueError("A report needs either sql_text or at least one source.")
+        return self
+
+
+class SourceOut(BaseModel):
+    name: str
+    source_type: str
+    sql_text: str | None
+    file_ref: str | None
+    params: dict[str, Any]
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
 
 class ReportDefinitionOut(BaseModel):
     id: int
     slug: str
     title: str
     description: str
-    sql_text: str
+    sql_text: str | None
+    sources: list[SourceOut] = Field(default_factory=list)
+    combine: dict[str, Any] | None = None
     params: dict[str, Any]
     columns: dict[str, Any]
     chart: dict[str, Any] | None
@@ -120,6 +216,25 @@ class ReportView(BaseModel):
     snapshot_at: dt.datetime | None
     snapshot_status: str | None
     stale: bool = False
+
+
+class PreviewOut(BaseModel):
+    """Dry-run result: real columns + a sample of rows, nothing persisted."""
+
+    result_columns: list[str]
+    rows: list[dict[str, Any]]
+    row_count: int
+
+
+class UploadedDatasetOut(BaseModel):
+    """Result of ingesting a CSV/XLSX: the ref to reference from a file source,
+    plus inferred columns and a small sample for builder preview."""
+
+    file_ref: str
+    filename: str
+    row_count: int
+    columns: dict[str, Any]
+    sample_rows: list[dict[str, Any]]
 
 
 class GroupIn(BaseModel):

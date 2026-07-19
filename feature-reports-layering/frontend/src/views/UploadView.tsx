@@ -3,18 +3,29 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import {
   createDefinition,
   getDefinition,
+  previewDefinition,
   updateDefinition,
 } from "../services/reportsApi";
 import type {
+  ChartConfig,
+  ColumnConfig,
+  CombineSpec,
   LayoutBlock,
   OutputType,
+  ParamSpec,
+  PreviewResult,
   ReportDefinitionInput,
+  SourceInput,
 } from "../types/reports";
 import type { ReportView } from "../types/reports";
 import { navigate } from "../hooks/useHashRoute";
 import { useToast } from "../components/Toast";
 import { LayoutEditor } from "../components/reports/LayoutEditor";
 import { ReportRenderer } from "../components/reports/ReportRenderer";
+import { SourceEditor } from "../components/reports/SourceEditor";
+import { ExpandableTextarea } from "../components/reports/ExpandableTextarea";
+import { MetadataEditor } from "../components/reports/MetadataEditor";
+import type { MetaShape } from "../components/reports/MetadataEditor";
 
 const TEMPLATE = `{
   "columns": {
@@ -68,10 +79,20 @@ export function UploadView({ slug }: { slug?: string } = {}) {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(isEdit);
 
+  // Data sources: legacy single SQL, or one-or-more blended sources/files.
+  const [sourceMode, setSourceMode] = useState<"single" | "sources">("single");
+  const [sources, setSources] = useState<SourceInput[]>([]);
+  const [combine, setCombine] = useState<CombineSpec | null>(null);
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  // Guards against stale preview responses (auto + manual) overwriting newer ones.
+  const previewTokenRef = useRef(0);
+
   // Split-editor sizing: give each pane its own scroll within a viewport-tall
   // container on wide screens (two scrollbars); stack + single scroll on mobile.
   const layoutRef = useRef<HTMLDivElement>(null);
-  const isWide = useMediaQuery("(min-width: 1101px)");
+  const isWide = useMediaQuery("(min-width: 901px)");
   const [paneH, setPaneH] = useState<number | undefined>(undefined);
 
   // Draggable divider: form pane width (px), persisted across sessions.
@@ -128,7 +149,23 @@ export function UploadView({ slug }: { slug?: string } = {}) {
       .then((d) => {
         setTitle(d.title);
         setDescription(d.description ?? "");
-        setSql(d.sql_text);
+        setSql(d.sql_text ?? "");
+        if (d.sources && d.sources.length) {
+          setSourceMode("sources");
+          setSources(
+            d.sources.map((s) => ({
+              name: s.name,
+              type: s.source_type,
+              sql: s.sql_text ?? "",
+              file_ref: s.file_ref ?? undefined,
+              params: s.params,
+              sort_order: s.sort_order,
+            })),
+          );
+          setCombine(d.combine ?? null);
+        } else {
+          setSourceMode("single");
+        }
         setGroups((d.access_groups ?? []).join(", "));
         setOutputs((d.output_types?.length ? d.output_types : ["table"]) as OutputType[]);
         setStatus(d.status as ReportDefinitionInput["status"]);
@@ -146,34 +183,88 @@ export function UploadView({ slug }: { slug?: string } = {}) {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  // ---- Unsaved-changes guard --------------------------------------------
+  const formSig = JSON.stringify({
+    title,
+    description,
+    sql,
+    groups,
+    meta,
+    outputs,
+    layout,
+    status,
+    sourceMode,
+    sources,
+    combine,
+  });
+  const baselineRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Capture the baseline once the form has finished loading (create or edit).
+    if (!loading && baselineRef.current === null) baselineRef.current = formSig;
+  }, [loading, formSig]);
+  const dirty = baselineRef.current !== null && formSig !== baselineRef.current;
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  // ---- Debounced auto-preview: refresh real-data preview after edits ----
+  useEffect(() => {
+    if (loading) return;
+    const hasData =
+      sourceMode === "sources"
+        ? sources.some((s) => (s.type === "sql" ? !!s.sql?.trim() : !!s.file_ref))
+        : !!sql.trim();
+    if (!hasData) return;
+    const handle = window.setTimeout(() => {
+      let input: ReportDefinitionInput;
+      try {
+        input = buildInput();
+      } catch {
+        return; // invalid metadata JSON mid-edit — skip this round
+      }
+      const token = ++previewTokenRef.current;
+      previewDefinition(input)
+        .then((p) => {
+          if (token === previewTokenRef.current) {
+            setPreview(p);
+            setPreviewError(null);
+          }
+        })
+        .catch(() => {
+          /* silent for auto-preview; the manual button surfaces errors */
+        });
+    }, 800);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, sourceMode, sql, JSON.stringify(sources), JSON.stringify(combine), meta]);
+
+  /** Navigate away, confirming first if there are unsaved edits. */
+  function leave(go: () => void) {
+    if (dirty && !window.confirm("You have unsaved changes. Discard them?")) return;
+    go();
+  }
+
   function toggleOutput(o: OutputType) {
     setOutputs((cur) =>
       cur.includes(o) ? cur.filter((x) => x !== o) : [...cur, o],
     );
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
+  /** Assemble the API payload from form state. Throws if metadata JSON is bad. */
+  function buildInput(): ReportDefinitionInput {
     let parsedMeta: Record<string, unknown> = {};
-    if (meta.trim()) {
-      try {
-        parsedMeta = JSON.parse(meta);
-      } catch (err) {
-        setError(
-          `Metadata is not valid JSON: ${
-            err instanceof Error ? err.message : "parse error"
-          }`,
-        );
-        return;
-      }
-    }
+    if (meta.trim()) parsedMeta = JSON.parse(meta);
 
     const input: ReportDefinitionInput = {
       title: title.trim(),
       description: description.trim(),
-      sql_text: sql,
       status,
       output_types: outputs.length ? outputs : ["table"],
       access_groups: groups
@@ -185,6 +276,58 @@ export function UploadView({ slug }: { slug?: string } = {}) {
       chart: (parsedMeta.chart as never) ?? null,
       layout: layout.length ? layout : null,
     };
+    if (sourceMode === "sources") {
+      input.sources = sources;
+      input.combine = sources.length >= 2 ? combine : null;
+    } else {
+      input.sql_text = sql;
+    }
+    return input;
+  }
+
+  async function onPreview() {
+    setPreviewError(null);
+    let input: ReportDefinitionInput;
+    try {
+      input = buildInput();
+    } catch (err) {
+      setPreviewError(
+        `Metadata is not valid JSON: ${
+          err instanceof Error ? err.message : "parse error"
+        }`,
+      );
+      return;
+    }
+    setPreviewing(true);
+    const token = ++previewTokenRef.current;
+    try {
+      const p = await previewDefinition(input);
+      if (token === previewTokenRef.current) setPreview(p);
+    } catch (err) {
+      if (token === previewTokenRef.current) {
+        setPreview(null);
+        setPreviewError(err instanceof Error ? err.message : "Preview failed.");
+      }
+    } finally {
+      if (token === previewTokenRef.current) setPreviewing(false);
+    }
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    let input: ReportDefinitionInput;
+    try {
+      input = buildInput();
+    } catch (err) {
+      setError(
+        `Metadata is not valid JSON: ${
+          err instanceof Error ? err.message : "parse error"
+        }`,
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -222,11 +365,38 @@ export function UploadView({ slug }: { slug?: string } = {}) {
     parsedMetaLive.columns && typeof parsedMetaLive.columns === "object"
       ? (parsedMetaLive.columns as Record<string, { format?: string }>)
       : {};
+  const paramsMeta =
+    parsedMetaLive.params && typeof parsedMetaLive.params === "object"
+      ? (parsedMetaLive.params as Record<string, ParamSpec>)
+      : {};
+  const chartMeta = (parsedMetaLive.chart as ChartConfig | null) ?? null;
   const availableColumns = Object.keys(columnsMeta);
   const previewRows = mockPreviewRows(columnsMeta);
 
+  // Columns offered to the chart pickers: those defined, plus any detected by a
+  // dry-run preview.
+  const metaColumnKeys = Array.from(
+    new Set([...availableColumns, ...(preview?.result_columns ?? [])]),
+  );
+
+  // Structured editors write back into the single `meta` JSON string, which
+  // stays the source of truth (buildInput parses it; the Advanced box mirrors it).
+  function updateMeta(next: MetaShape) {
+    setMeta(
+      JSON.stringify(
+        { columns: next.columns, chart: next.chart, params: next.params },
+        null,
+        2,
+      ),
+    );
+  }
+
   // A synthetic ReportView so the right pane renders the whole composed page
   // (KPIs + charts + table) live from sample rows as you build.
+  // Prefer real dry-run rows once the author has previewed; else sample rows.
+  const usingRealPreview = preview !== null;
+  const renderRows = usingRealPreview ? preview.rows : previewRows;
+  const renderCols = usingRealPreview ? preview.result_columns : availableColumns;
   const previewView: ReportView = {
     slug: "__preview__",
     title: title || "Untitled report",
@@ -235,9 +405,9 @@ export function UploadView({ slug }: { slug?: string } = {}) {
     layout: layout.length ? layout : null,
     columns: columnsMeta as never,
     chart: (parsedMetaLive.chart as never) ?? null,
-    result_columns: availableColumns,
-    rows: previewRows,
-    row_count: previewRows.length,
+    result_columns: renderCols,
+    rows: renderRows,
+    row_count: renderRows.length,
     snapshot_at: null,
     snapshot_status: null,
     stale: false,
@@ -249,7 +419,7 @@ export function UploadView({ slug }: { slug?: string } = {}) {
       className={`rl-editor-layout${split ? " rl-editor-split" : ""}`}
       style={
         split
-          ? { height: paneH, gridTemplateColumns: `${formWidth}px 7px minmax(0, 1fr)` }
+          ? { height: paneH, gridTemplateColumns: `${formWidth}px 10px minmax(0, 1fr)` }
           : undefined
       }
     >
@@ -258,7 +428,7 @@ export function UploadView({ slug }: { slug?: string } = {}) {
         <button
           type="button"
           className="rl-back"
-          onClick={() => navigate({ view: "report", slug: slug as string })}
+          onClick={() => leave(() => navigate({ view: "report", slug: slug as string }))}
         >
           ← Back to report
         </button>
@@ -277,6 +447,13 @@ export function UploadView({ slug }: { slug?: string } = {}) {
             renders it with the shared, consistent report layout.
           </>
         )}
+      </p>
+
+      <p className="rl-hint" style={{ marginTop: -12, marginBottom: 16 }}>
+        New here?{" "}
+        <a href="#/help" onClick={() => navigate({ view: "help" })}>
+          Read the builder guide →
+        </a>
       </p>
 
       {error && <div className="rl-banner rl-banner-error">{error}</div>}
@@ -299,26 +476,92 @@ export function UploadView({ slug }: { slug?: string } = {}) {
 
       <div className="rl-field">
         <label htmlFor="rl-desc">Description</label>
-        <input
+        <ExpandableTextarea
           id="rl-desc"
+          label="Description"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
           placeholder="What this report shows and who it's for."
+          rows={2}
         />
       </div>
 
       <div className="rl-field">
-        <label htmlFor="rl-sql">SQL (read-only SELECT)</label>
-        <textarea
-          id="rl-sql"
-          value={sql}
-          onChange={(e) => setSql(e.target.value)}
-          placeholder={"SELECT region, COUNT(*) AS n\nFROM policies\nGROUP BY region"}
-          required
-        />
+        <label>Data source</label>
+        <div className="rl-actions">
+          <button
+            type="button"
+            className={sourceMode === "single" ? "rl-btn rl-btn-primary" : "rl-btn"}
+            onClick={() => setSourceMode("single")}
+          >
+            Single SQL query
+          </button>
+          <button
+            type="button"
+            className={sourceMode === "sources" ? "rl-btn rl-btn-primary" : "rl-btn"}
+            onClick={() => {
+              setSourceMode("sources");
+              if (!sources.length)
+                setSources([{ name: "source_a", type: "sql", sql: "" }]);
+            }}
+          >
+            Multiple sources / files
+          </button>
+        </div>
         <span className="rl-hint">
-          Use <code>:name</code> bind params; declare them in metadata below.
+          Blend multiple SQL queries and/or uploaded CSV/XLSX files, or keep a
+          single query.
         </span>
+      </div>
+
+      {sourceMode === "single" ? (
+        <div className="rl-field">
+          <label htmlFor="rl-sql">SQL (read-only SELECT)</label>
+          <ExpandableTextarea
+            id="rl-sql"
+            label="SQL (read-only SELECT)"
+            value={sql}
+            onChange={setSql}
+            placeholder={"SELECT region, COUNT(*) AS n\nFROM policies\nGROUP BY region"}
+            rows={4}
+            monospace
+          />
+          <span className="rl-hint">
+            Use <code>:name</code> bind params; declare them in metadata below.
+          </span>
+        </div>
+      ) : (
+        <div className="rl-field">
+          <label>Sources</label>
+          <SourceEditor
+            sources={sources}
+            combine={combine}
+            onSourcesChange={setSources}
+            onCombineChange={setCombine}
+          />
+        </div>
+      )}
+
+      <div className="rl-field">
+        <div className="rl-actions">
+          <button
+            type="button"
+            className="rl-btn"
+            onClick={onPreview}
+            disabled={previewing}
+          >
+            {previewing ? "Previewing…" : "Preview data"}
+          </button>
+          {preview && (
+            <span className="rl-hint">
+              {preview.row_count} rows · {preview.result_columns.join(", ")}
+            </span>
+          )}
+        </div>
+        <span className="rl-hint">Preview auto-refreshes as you edit; click to refresh now.</span>
+        {previewError && (
+          <div className="rl-banner rl-banner-error">{previewError}</div>
+        )}
       </div>
 
       <div className="rl-field">
@@ -351,16 +594,32 @@ export function UploadView({ slug }: { slug?: string } = {}) {
       </div>
 
       <div className="rl-field">
-        <label htmlFor="rl-meta">Display metadata (JSON)</label>
-        <textarea
-          id="rl-meta"
-          value={meta}
-          onChange={(e) => setMeta(e.target.value)}
-          spellCheck={false}
+        <label>Display metadata</label>
+        <MetadataEditor
+          columns={columnsMeta as Record<string, ColumnConfig>}
+          params={paramsMeta}
+          chart={chartMeta}
+          columnKeys={metaColumnKeys}
+          sampleRows={preview?.rows ?? []}
+          onChange={updateMeta}
         />
-        <span className="rl-hint">
-          columns (labels + formats), chart hints, and param specs.
-        </span>
+        <details className="rl-advanced">
+          <summary className="rl-hint">Advanced: raw JSON</summary>
+          <ExpandableTextarea
+            id="rl-meta"
+            label="Display metadata (JSON)"
+            value={meta}
+            onChange={setMeta}
+            rows={8}
+            monospace
+            spellCheck={false}
+            json
+          />
+          <span className="rl-hint">
+            columns (labels + formats), chart hints, and param specs. Extra
+            column hints (bar/heat/badge/group) live here.
+          </span>
+        </details>
       </div>
 
       <div className="rl-field">
@@ -391,10 +650,12 @@ export function UploadView({ slug }: { slug?: string } = {}) {
           type="button"
           className="rl-btn"
           onClick={() =>
-            navigate(
-              isEdit
-                ? { view: "report", slug: slug as string }
-                : { view: "browse" },
+            leave(() =>
+              navigate(
+                isEdit
+                  ? { view: "report", slug: slug as string }
+                  : { view: "browse" },
+              ),
             )
           }
         >
@@ -415,15 +676,19 @@ export function UploadView({ slug }: { slug?: string } = {}) {
 
       <aside className="rl-editor-preview">
         <div className="rl-preview-head">
-          Live preview <span className="rl-preview-badge">sample data</span>
+          Live preview{" "}
+          <span className="rl-preview-badge">
+            {usingRealPreview ? "real data" : "sample data"}
+          </span>
         </div>
-        {availableColumns.length ? (
+        {renderRows.length || availableColumns.length ? (
           <div className="rl-preview-body">
             <ReportRenderer report={previewView} />
           </div>
         ) : (
           <p className="rl-hint">
-            Define columns in the metadata to preview the composed page.
+            Define columns in the metadata, or click “Preview data”, to see the
+            composed page.
           </p>
         )}
       </aside>

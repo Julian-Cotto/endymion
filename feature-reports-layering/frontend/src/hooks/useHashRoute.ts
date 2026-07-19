@@ -5,13 +5,15 @@ export type Route =
   | { view: "dashboard" }
   | { view: "report"; slug: string }
   | { view: "upload" }
-  | { view: "edit"; slug: string };
+  | { view: "edit"; slug: string }
+  | { view: "help" };
 
-// Slug-navigable hash routes: #/  #/dashboard  #/r/<slug>  #/upload  #/edit/<slug>
+// Slug-navigable hash routes: #/  #/dashboard  #/r/<slug>  #/upload  #/edit/<slug>  #/help
 export function parseHash(hash: string): Route {
   const clean = hash.replace(/^#\/?/, "");
   if (clean === "dashboard") return { view: "dashboard" };
   if (clean === "upload") return { view: "upload" };
+  if (clean === "help") return { view: "help" };
   const edit = clean.match(/^edit\/(.+)$/);
   if (edit) return { view: "edit", slug: decodeURIComponent(edit[1]) };
   const m = clean.match(/^r\/(.+)$/);
@@ -27,6 +29,8 @@ export function routeToHash(route: Route): string {
       return `#/edit/${encodeURIComponent(route.slug)}`;
     case "upload":
       return "#/upload";
+    case "help":
+      return "#/help";
     case "dashboard":
       return "#/dashboard";
     default:

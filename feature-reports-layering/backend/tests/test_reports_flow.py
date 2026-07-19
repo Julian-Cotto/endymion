@@ -106,3 +106,258 @@ def test_rejects_undeclared_param(client):
     r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
     assert r.status_code == 422
     assert "status" in r.json()["detail"]
+
+
+def test_multi_source_join_flow(client):
+    # Two SQL sources joined on a shared key; mock mode synthesizes aligned
+    # keys so the inner join actually matches.
+    payload = {
+        "title": "Blended Policies",
+        "sources": [
+            {"name": "a", "type": "sql", "sql": "SELECT k, x FROM ta"},
+            {"name": "b", "type": "sql", "sql": "SELECT k, y FROM tb"},
+        ],
+        "combine": {
+            "op": "join",
+            "joins": [{"left": "a", "right": "b", "on": [["k", "k"]], "how": "inner"}],
+        },
+        "columns": {"k": {"label": "Key"}},
+        "output_types": ["table"],
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 201, r.text
+    body = r.json()
+    slug = body["slug"]
+    assert body["last_snapshot_status"] == "ok"
+
+    # Definition round-trips its sources; legacy sql_text is empty.
+    d = client.get(f"{API}/definitions/{slug}", headers=_hdr(AUTHOR)).json()
+    assert [s["name"] for s in d["sources"]] == ["a", "b"]
+    assert d["sql_text"] is None
+    assert d["combine"]["op"] == "join"
+
+    # The view exposes the blended rows.
+    view = client.get(f"{API}/reports/{slug}", headers=_hdr(AUTHOR)).json()
+    assert view["row_count"] == 8
+    assert set(view["result_columns"]) == {"k", "a_value", "b_value"}
+
+
+def test_rejects_sources_and_sql_together(client):
+    payload = {
+        "title": "Both",
+        "sql_text": "SELECT 1 AS n",
+        "sources": [{"name": "a", "type": "sql", "sql": "SELECT 1 AS n"}],
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 422
+
+
+def test_rejects_multi_source_without_combine(client):
+    payload = {
+        "title": "NoCombine",
+        "sources": [
+            {"name": "a", "type": "sql", "sql": "SELECT 1 AS n"},
+            {"name": "b", "type": "sql", "sql": "SELECT 2 AS n"},
+        ],
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 422
+
+
+def test_upload_and_file_source_report(client):
+    csv = b"region,n\nWest,5\nEast,7\n"
+    up = client.post(
+        f"{API}/uploads",
+        files={"file": ("book.csv", csv, "text/csv")},
+        headers=_hdr(AUTHOR),
+    )
+    assert up.status_code == 201, up.text
+    body = up.json()
+    assert body["row_count"] == 2
+    assert set(body["columns"]) == {"region", "n"}
+    ref = body["file_ref"]
+
+    payload = {
+        "title": "From File",
+        "sources": [{"name": "book", "type": "file", "file_ref": ref}],
+        "columns": {"region": {"label": "Region"}, "n": {"label": "N", "format": "int"}},
+        "output_types": ["table"],
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 201, r.text
+    slug = r.json()["slug"]
+    assert r.json()["last_snapshot_status"] == "ok"
+
+    view = client.get(f"{API}/reports/{slug}", headers=_hdr(AUTHOR)).json()
+    assert view["row_count"] == 2
+    assert view["rows"] == [{"region": "West", "n": 5}, {"region": "East", "n": 7}]
+
+
+def test_two_file_sources_join(client):
+    ref_a = client.post(
+        f"{API}/uploads",
+        files={"file": ("pol.csv", b"id,prem\n1,100\n2,200\n", "text/csv")},
+        headers=_hdr(AUTHOR),
+    ).json()["file_ref"]
+    ref_b = client.post(
+        f"{API}/uploads",
+        files={"file": ("clm.csv", b"id,paid\n1,10\n3,30\n", "text/csv")},
+        headers=_hdr(AUTHOR),
+    ).json()["file_ref"]
+
+    payload = {
+        "title": "Joined Files",
+        "sources": [
+            {"name": "pol", "type": "file", "file_ref": ref_a},
+            {"name": "clm", "type": "file", "file_ref": ref_b},
+        ],
+        "combine": {
+            "op": "join",
+            "joins": [{"left": "pol", "right": "clm", "on": [["id", "id"]], "how": "inner"}],
+        },
+        "output_types": ["table"],
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 201, r.text
+    slug = r.json()["slug"]
+
+    view = client.get(f"{API}/reports/{slug}", headers=_hdr(AUTHOR)).json()
+    assert view["row_count"] == 1  # inner join: only id=1 in both
+    assert view["rows"] == [{"id": 1, "prem": 100, "paid": 10}]
+
+
+def test_file_source_unknown_ref_rejected(client):
+    payload = {
+        "title": "BadRef",
+        "sources": [{"name": "x", "type": "file", "file_ref": "deadbeef"}],
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 422
+    assert "not found" in r.json()["detail"]
+
+
+def test_preview_multi_source_does_not_persist(client):
+    before = len(client.get(f"{API}/definitions", headers=_hdr(AUTHOR)).json())
+    payload = {
+        "title": "Preview Only",
+        "sources": [
+            {"name": "a", "type": "sql", "sql": "SELECT k, x FROM ta"},
+            {"name": "b", "type": "sql", "sql": "SELECT k, y FROM tb"},
+        ],
+        "combine": {
+            "op": "join",
+            "joins": [{"left": "a", "right": "b", "on": [["k", "k"]], "how": "inner"}],
+        },
+        "columns": {"k": {"label": "Key"}},
+    }
+    r = client.post(f"{API}/definitions/preview", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["row_count"] == 8
+    assert set(body["result_columns"]) == {"k", "a_value", "b_value"}
+
+    # Preview persists nothing: no new definition, no snapshot.
+    after = len(client.get(f"{API}/definitions", headers=_hdr(AUTHOR)).json())
+    assert after == before
+
+
+def test_preview_rejects_bad_sql(client):
+    payload = {"title": "Bad", "sql_text": "DROP TABLE policies"}
+    r = client.post(f"{API}/definitions/preview", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 422
+
+
+def test_events_emitted_on_create(client, monkeypatch):
+    from app.events import publisher
+
+    captured: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        publisher, "publish_event", lambda name, payload: captured.append((name, payload))
+    )
+
+    payload = {
+        "title": "Event Emitter",
+        "sources": [
+            {"name": "a", "type": "sql", "sql": "SELECT k, x FROM ta"},
+            {"name": "b", "type": "sql", "sql": "SELECT k, y FROM tb"},
+        ],
+        "combine": {
+            "op": "join",
+            "joins": [{"left": "a", "right": "b", "on": [["k", "k"]], "how": "inner"}],
+        },
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 201, r.text
+
+    names = [n for n, _ in captured]
+    assert "reports-layering.snapshot-refreshed" in names
+    published = next(p for n, p in captured if n == "reports-layering.report-published")
+    assert published["source_count"] == 2
+    assert published["source_types"] == ["sql"]
+    assert published["has_combine"] is True
+
+
+def test_column_renderer_hints_persist(client):
+    payload = {
+        "title": "Hints",
+        "sql_text": "SELECT region, n FROM t",
+        "columns": {
+            "n": {
+                "label": "N",
+                "format": "int",
+                "agg": "sum",
+                "bar": True,
+                "heat": "reverse",
+                "style": "badge",
+                "group": "Performance",
+            }
+        },
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=_hdr(AUTHOR))
+    assert r.status_code == 201, r.text
+    col = r.json()["columns"]["n"]
+    assert col["agg"] == "sum"
+    assert col["bar"] is True
+    assert col["heat"] == "reverse"
+    assert col["style"] == "badge"
+    assert col["group"] == "Performance"
+
+
+def test_prune_orphan_uploads(client):
+    kept = client.post(
+        f"{API}/uploads",
+        files={"file": ("keep.csv", b"id\n1\n", "text/csv")},
+        headers=_hdr(AUTHOR),
+    ).json()["file_ref"]
+    orphan = client.post(
+        f"{API}/uploads",
+        files={"file": ("orphan.csv", b"id\n2\n", "text/csv")},
+        headers=_hdr(AUTHOR),
+    ).json()["file_ref"]
+
+    # Reference only `kept`.
+    r = client.post(
+        f"{API}/definitions",
+        json={"title": "Keeps Ref", "sources": [{"name": "k", "type": "file", "file_ref": kept}]},
+        headers=_hdr(AUTHOR),
+    )
+    assert r.status_code == 201, r.text
+
+    # Prune everything unreferenced regardless of age.
+    r = client.post(f"{API}/maintenance/prune-uploads?older_than_hours=0", headers=_hdr(AUTHOR))
+    assert r.status_code == 200, r.text
+    assert r.json()["deleted"] >= 1
+
+    # The orphan is gone (referencing it now 422s); the kept one still works.
+    r_orphan = client.post(
+        f"{API}/definitions",
+        json={"title": "Dead Ref", "sources": [{"name": "o", "type": "file", "file_ref": orphan}]},
+        headers=_hdr(AUTHOR),
+    )
+    assert r_orphan.status_code == 422
+    r_keep = client.post(
+        f"{API}/definitions",
+        json={"title": "Keep Again", "sources": [{"name": "k2", "type": "file", "file_ref": kept}]},
+        headers=_hdr(AUTHOR),
+    )
+    assert r_keep.status_code == 201, r_keep.text

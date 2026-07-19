@@ -41,6 +41,8 @@ class JsonLogFormatter(logging.Formatter):
 
         for key in (
             "event",
+            "event_name",
+            "correlation_id",
             "method",
             "path",
             "query",

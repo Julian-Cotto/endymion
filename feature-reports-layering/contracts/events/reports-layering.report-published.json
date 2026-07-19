@@ -1,12 +1,29 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ReportDefinitionPublished",
-  "description": "Schema stub for reports-layering.report-published",
+  "description": "Emitted when a report definition is created or updated (after its first/refreshed snapshot).",
   "type": "object",
   "properties": {
     "correlationId": { "type": "string" },
-    "timestamp": { "type": "string" },
-    "payload": { "type": "object", "additionalProperties": true }
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "version": { "type": "integer" },
+        "status": { "type": "string", "enum": ["active", "draft", "archived"] },
+        "source_count": { "type": "integer" },
+        "source_types": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["sql", "file"] }
+        },
+        "has_combine": { "type": "boolean" },
+        "actor": { "type": ["string", "null"] }
+      },
+      "required": ["slug", "version", "status", "source_count", "source_types"],
+      "additionalProperties": true
+    }
   },
   "required": ["payload"],
   "additionalProperties": true

@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import io
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_auth_context
@@ -16,13 +16,17 @@ from app.schemas.report import (
     GroupOut,
     MembershipIn,
     MembershipOut,
+    PreviewOut,
     ReportDefinitionIn,
     ReportDefinitionOut,
     ReportSummary,
     ReportView,
+    UploadedDatasetOut,
 )
-from app.services.reports import access, definitions, groups, snapshots
+from app.events import reports_events
+from app.services.reports import access, datasets, definitions, groups, ingest, snapshots
 from app.services.reports.definitions import DefinitionError
+from app.services.reports.ingest import IngestError
 
 router = APIRouter(prefix="/reports-layering", tags=["reports-layering"])
 
@@ -172,6 +176,45 @@ def get_definition(
     return _definition_out(db, defn)
 
 
+@router.post("/uploads", response_model=UploadedDatasetOut, status_code=status.HTTP_201_CREATED)
+async def upload_dataset(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(require_author),
+):
+    """Ingest a CSV/XLSX and store it as a dataset. Returns a `file_ref` to wire
+    into a source (`{"type": "file", "file_ref": ...}`) plus inferred columns."""
+    content = await file.read()
+    try:
+        parsed = ingest.parse_file(file.filename or "", content)
+    except IngestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    ds = datasets.create_dataset(
+        db, filename=file.filename or "upload", parsed=parsed, created_by=ctx.email or ctx.user_id
+    )
+    return UploadedDatasetOut(
+        file_ref=ds.ref,
+        filename=ds.filename,
+        row_count=ds.row_count,
+        columns=ds.columns,
+        sample_rows=ds.row_data[:5],
+    )
+
+
+@router.post("/definitions/preview", response_model=PreviewOut)
+def preview_report(
+    payload: ReportDefinitionIn,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(require_author),
+):
+    """Dry-run: compute real columns + sample rows for an unsaved definition."""
+    try:
+        defn = definitions.build_preview_definition(db, payload)
+    except DefinitionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return snapshots.preview_definition(db, defn)
+
+
 @router.post("/definitions", response_model=ReportDefinitionOut, status_code=status.HTTP_201_CREATED)
 def create_definition(
     payload: ReportDefinitionIn,
@@ -184,6 +227,7 @@ def create_definition(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     # Immediate snapshot so the author sees output right away.
     snapshots.refresh_snapshot(db, defn)
+    reports_events.report_published(defn, actor=ctx.email or ctx.user_id)
     return _definition_out(db, defn)
 
 
@@ -202,6 +246,7 @@ def update_definition(
     except DefinitionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     snapshots.refresh_snapshot(db, defn)
+    reports_events.report_published(defn, actor=ctx.email or ctx.user_id)
     return _definition_out(db, defn)
 
 
@@ -219,6 +264,20 @@ def refresh_definition(
     if snap.status != "ok":
         raise HTTPException(status_code=502, detail=f"Snapshot failed: {snap.error}")
     return _definition_out(db, defn)
+
+
+# ----------------------------------------------------------------------------
+# Maintenance
+# ----------------------------------------------------------------------------
+@router.post("/maintenance/prune-uploads")
+def prune_uploads(
+    older_than_hours: int = 24,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(require_admin),
+):
+    """Delete uploaded datasets not referenced by any source (GC for orphans)."""
+    deleted = datasets.delete_orphans(db, older_than_hours=older_than_hours)
+    return {"deleted": deleted}
 
 
 # ----------------------------------------------------------------------------

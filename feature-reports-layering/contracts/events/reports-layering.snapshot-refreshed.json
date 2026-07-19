@@ -1,12 +1,27 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SnapshotRefreshed",
-  "description": "Schema stub for reports-layering.snapshot-refreshed",
+  "description": "Emitted after a report's snapshot is (re)computed, ok or error.",
   "type": "object",
   "properties": {
     "correlationId": { "type": "string" },
-    "timestamp": { "type": "string" },
-    "payload": { "type": "object", "additionalProperties": true }
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string" },
+        "snapshot_status": { "type": "string", "enum": ["ok", "error"] },
+        "row_count": { "type": "integer" },
+        "elapsed_ms": { "type": ["integer", "null"] },
+        "source_count": { "type": "integer" },
+        "source_types": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["sql", "file"] }
+        }
+      },
+      "required": ["slug", "snapshot_status", "row_count", "source_count"],
+      "additionalProperties": true
+    }
   },
   "required": ["payload"],
   "additionalProperties": true

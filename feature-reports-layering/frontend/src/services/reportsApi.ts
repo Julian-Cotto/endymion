@@ -1,10 +1,12 @@
 import { apiGet, apiPost, apiPut, buildUrl } from "./apiClient";
 import { resolveFeatureAuthContext } from "../platform/authAdapter";
 import type {
+  PreviewResult,
   ReportDefinition,
   ReportDefinitionInput,
   ReportSummary,
   ReportView,
+  UploadedDataset,
 } from "../types/reports";
 
 const BASE = "/reports-layering";
@@ -48,6 +50,34 @@ export function refreshDefinition(slug: string): Promise<ReportDefinition> {
   return apiPost<ReportDefinition>(
     `${BASE}/definitions/${encodeURIComponent(slug)}/refresh`,
   );
+}
+
+/** Dry-run: real columns + sample rows for an unsaved definition. */
+export function previewDefinition(
+  input: ReportDefinitionInput,
+): Promise<PreviewResult> {
+  return apiPost<PreviewResult>(`${BASE}/definitions/preview`, input);
+}
+
+/** Upload a CSV/XLSX and get back a file_ref + inferred columns. Multipart, so
+ * it bypasses the JSON client (which would force a Content-Type). */
+export async function uploadDataset(file: File): Promise<UploadedDataset> {
+  const url = buildUrl(`${BASE}/uploads`);
+  const auth = resolveFeatureAuthContext();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${auth.accessToken}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `Upload failed: ${res.status} ${res.statusText}${body ? ` - ${body}` : ""}`,
+    );
+  }
+  return (await res.json()) as UploadedDataset;
 }
 
 /** CSV export is a file download, so it bypasses the JSON client. */

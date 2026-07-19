@@ -289,14 +289,36 @@
   transition: background-color 0.12s ease;
 }
 .rl-divider::after {
-  /* widen the hit area beyond the visible 7px */
+  /* widen the hit area beyond the visible bar */
   content: "";
   position: absolute;
-  inset: 0 -6px;
+  inset: 0 -7px;
+}
+.rl-divider::before {
+  /* visible grip: a short column of dots so it reads as draggable */
+  content: "";
+  position: absolute;
+  top: calc(50% - 13px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 26px;
+  opacity: 0.75;
+  background: radial-gradient(
+    circle,
+    var(--rl-text-muted) 1px,
+    transparent 1.6px
+  );
+  background-size: 4px 6px;
 }
 .rl-divider:hover,
 .rl-divider:active {
   background: var(--rl-primary);
+}
+.rl-divider:hover::before,
+.rl-divider:active::before {
+  background: radial-gradient(circle, var(--rl-primary-fg) 1px, transparent 1.6px);
+  background-size: 4px 6px;
 }
 .rl-preview-head {
   display: flex;
@@ -319,7 +341,7 @@
   text-transform: none;
   letter-spacing: normal;
 }
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .rl-editor-layout {
     grid-template-columns: 1fr;
   }
@@ -1635,5 +1657,605 @@
   .rl-table th,
   .rl-table .rl-sticky-col {
     position: static;
+  }
+}
+
+/* ---- Source editor (multi-source builder) ---- */
+.rl-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rl-source-card {
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface-2);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rl-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rl-source-name {
+  font-weight: 600;
+  max-width: 220px;
+}
+.rl-source-sql {
+  width: 100%;
+  min-height: 64px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.rl-source-file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rl-combine {
+  border-top: 1px dashed var(--rl-border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rl-join {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rl-join-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.rl-join-row select,
+.rl-join-row input {
+  padding: 4px 8px;
+}
+
+/* ---- Structured metadata editor ---- */
+.rl-metaedit {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rl-meta-section {
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface-2);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rl-meta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+.rl-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.rl-meta-row > input,
+.rl-meta-row > select {
+  padding: 4px 8px;
+}
+.rl-meta-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+}
+.rl-meta-summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+.rl-meta-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.rl-meta-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rl-grid-scroll {
+  overflow-x: auto;
+}
+.rl-col-head,
+.rl-col-row {
+  display: grid;
+  grid-template-columns: 48px 130px minmax(150px, 1fr) 112px 92px 104px 44px 34px;
+  gap: 6px;
+  align-items: center;
+  min-width: 716px;
+}
+.rl-reorder {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  justify-content: center;
+}
+.rl-drag {
+  cursor: grab;
+  color: var(--rl-text-muted);
+  user-select: none;
+  text-align: center;
+  line-height: 1;
+}
+.rl-drag:active {
+  cursor: grabbing;
+}
+.rl-move {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rl-move button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 15px;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--rl-text-muted);
+  background: var(--rl-surface);
+  border: 1px solid var(--rl-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rl-move button:hover:not(:disabled) {
+  color: var(--rl-primary);
+  border-color: var(--rl-primary);
+}
+.rl-move button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.rl-col-row.rl-dragging {
+  opacity: 0.45;
+}
+.rl-warn {
+  color: var(--rl-warn);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.rl-param-head,
+.rl-param-row {
+  display: grid;
+  grid-template-columns: 150px 110px minmax(120px, 1fr) 50px 34px;
+  gap: 6px;
+  align-items: center;
+  min-width: 500px;
+}
+.rl-col-head,
+.rl-param-head {
+  font-size: 11px;
+  color: var(--rl-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 2px 2px;
+}
+.rl-col-row,
+.rl-param-row {
+  padding: 2px 0;
+}
+.rl-col-row > input,
+.rl-col-row > select,
+.rl-param-row > input,
+.rl-param-row > select {
+  padding: 5px 8px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rl-cell-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rl-btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1;
+}
+.rl-chart-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rl-chart-y {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.rl-advanced {
+  margin-top: 10px;
+}
+.rl-advanced > summary {
+  cursor: pointer;
+  user-select: none;
+}
+.rl-advanced > textarea {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.rl-joins {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rl-joins .rl-join {
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  padding: 8px;
+  background: var(--rl-surface);
+}
+
+/* ---- Builder guide (HelpView) ---- */
+.rl-help {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 8px 4px 64px;
+  line-height: 1.55;
+}
+.rl-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rl-help-lead {
+  color: var(--rl-text-muted);
+  margin: 8px 0 20px;
+}
+.rl-help-toc {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 4px 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface-2);
+  margin-bottom: 28px;
+}
+.rl-help-toc a {
+  color: var(--rl-primary);
+  text-decoration: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+.rl-help-toc a:hover {
+  text-decoration: underline;
+}
+.rl-help-section {
+  margin-bottom: 32px;
+  scroll-margin-top: 16px;
+}
+.rl-help-section h2 {
+  border-bottom: 1px solid var(--rl-border);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+}
+.rl-help-section h3 {
+  margin: 18px 0 6px;
+}
+.rl-help-section ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.rl-help-section li {
+  margin: 4px 0;
+}
+.rl-help-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--rl-surface-2);
+  border: 1px solid var(--rl-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.rl-help-json {
+  background: var(--rl-surface-2);
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.rl-help-table-wrap {
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.rl-help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.rl-help-table th,
+.rl-help-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--rl-border);
+}
+.rl-help-table th {
+  color: var(--rl-text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rl-help-type {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--rl-text-muted);
+  white-space: nowrap;
+}
+
+/* ---- Guide figures ---- */
+.rl-help-fig {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface-2);
+}
+.rl-help-fig svg {
+  width: 100%;
+  height: auto;
+  color: var(--rl-text-muted);
+}
+.rl-help-fig > .rl-hint {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+}
+.rl-combine-fig {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 6px 0;
+}
+.rl-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 14px;
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.rl-chip small {
+  font-weight: 400;
+  color: var(--rl-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.rl-chip-out {
+  border-color: var(--rl-primary);
+  background: var(--rl-primary-weak);
+}
+.rl-op {
+  color: var(--rl-text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.rl-help-steps {
+  padding-left: 22px;
+}
+.rl-help-steps li {
+  margin: 10px 0;
+}
+.rl-help-steps .rl-help-json {
+  margin: 6px 0;
+}
+
+/* ---- Expandable textarea + dedicated editor modal ---- */
+.rl-exp {
+  position: relative;
+}
+.rl-exp-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 8px 34px 8px 10px; /* right pad leaves room for the expand button */
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface);
+  color: var(--rl-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.rl-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.rl-exp-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rl-border);
+  border-radius: 6px;
+  background: var(--rl-surface);
+  color: var(--rl-text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.rl-exp-btn:hover {
+  color: var(--rl-primary);
+  border-color: var(--rl-primary);
+}
+
+.rl-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.rl-modal {
+  width: min(1040px, 100%);
+  height: min(82vh, 940px);
+  display: flex;
+  flex-direction: column;
+  background: var(--rl-surface);
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius);
+  box-shadow: var(--rl-shadow);
+  padding: 16px 18px;
+}
+.rl-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.rl-modal-textarea {
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  padding: 12px 14px;
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface);
+  color: var(--rl-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.rl-modal-foot {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---- Resize safety --------------------------------------------------------
+ * When the form/preview divider is dragged narrow, wide inner content (the
+ * columns/params grids, source cards, tables) must SCROLL inside its own
+ * section rather than force the pane wider and spill over the divider.
+ * Flex items default to min-width:auto (= min-content), which propagates the
+ * grids' min-width up the tree; min-width:0 lets each level shrink so the
+ * grid's own overflow-x:auto engages.
+ * ------------------------------------------------------------------------- */
+.rl-field,
+.rl-metaedit,
+.rl-meta-section,
+.rl-meta-body,
+.rl-grid-scroll,
+.rl-sources,
+.rl-source-card,
+.rl-source-file,
+.rl-combine,
+.rl-join,
+.rl-joins,
+.rl-chart-builder,
+.rl-chart-y,
+.rl-editor-preview,
+.rl-preview-body {
+  min-width: 0;
+}
+/* Belt-and-suspenders: never let the form pane's content bleed horizontally
+ * past its column — wide bits get their own scroll containers above. */
+.rl-editor-split .rl-editor-form {
+  overflow-x: hidden;
+}
+
+/* ---- Builder on small screens (phones) ---- */
+@media (max-width: 720px) {
+  /* The dedicated text-editor modal goes full-screen for real editing room. */
+  .rl-modal-backdrop {
+    padding: 0;
+  }
+  .rl-modal {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+  /* Tighter metadata sections; let the Detect / + Add actions breathe + wrap. */
+  .rl-metaedit {
+    gap: 12px;
+  }
+  .rl-meta-section {
+    padding: 10px;
+  }
+  .rl-meta-actions {
+    gap: 8px;
+  }
+  /* Comfortable tap targets for the compact grid controls. */
+  .rl-col-row > input,
+  .rl-col-row > select,
+  .rl-param-row > input,
+  .rl-param-row > select {
+    padding: 8px;
+  }
+  .rl-col-head,
+  .rl-col-row {
+    align-items: stretch;
+  }
+  .rl-drag {
+    font-size: 16px;
+  }
+  /* The columns/params grids scroll horizontally within their section (contained);
+     hint that they're swipeable. */
+  .rl-grid-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Drag-and-drop isn't supported on touch — hide the grip, lean on ▲▼. */
+  .rl-reorder .rl-drag {
+    display: none;
+  }
+  .rl-move button {
+    width: 28px;
+    height: 22px;
+    font-size: 11px;
   }
 }

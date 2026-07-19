@@ -4,12 +4,16 @@ from .report import (
     GroupMembership,
     ReportDefinition,
     ReportSnapshot,
+    ReportSource,
+    UploadedDataset,
 )
 
 __all__ = [
     "ExampleRecord",
     "ReportDefinition",
     "ReportSnapshot",
+    "ReportSource",
+    "UploadedDataset",
     "Group",
     "GroupMembership",
 ]

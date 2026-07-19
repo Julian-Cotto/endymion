@@ -5,10 +5,15 @@ pydantic-settings
 httpx
 PyJWT[crypto]
 jsonschema>=4.22.0
+python-multipart
 
 sqlalchemy
 psycopg2-binary
 alembic
+
+# File-source ingestion + multi-source blending (CSV/XLSX -> rows).
+pandas
+openpyxl
 
 -e ../../app-platform-snowflake-client[snowflake]
 
