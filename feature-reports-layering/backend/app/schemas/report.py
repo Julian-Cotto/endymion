@@ -53,6 +53,21 @@ class LayoutBlock(BaseModel):
     text: str | None = None  # used when type == "note"
 
 
+Cadence = Literal["hourly", "daily", "weekly", "monthly", "cron"]
+
+
+class ScheduleEntry(BaseModel):
+    """A saved refresh schedule. Stored + editable; no runner consumes it yet."""
+
+    cadence: Cadence = "daily"
+    time: str | None = None  # "HH:MM" for daily/weekly/monthly
+    day_of_week: int | None = Field(default=None, ge=0, le=6)  # 0=Mon
+    day_of_month: int | None = Field(default=None, ge=1, le=31)
+    cron: str | None = None  # raw cron when cadence == "cron"
+    label: str | None = None
+    enabled: bool = True
+
+
 class SourceSpec(BaseModel):
     """One input feeding a report: a SQL query or an uploaded file dataset."""
 
@@ -119,6 +134,8 @@ class ReportDefinitionIn(BaseModel):
     layout: list[LayoutBlock] | None = None
     access_groups: list[str] = Field(default_factory=list)
     status: Literal["active", "draft", "archived"] = "active"
+    is_live: bool = True
+    schedules: list[ScheduleEntry] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
 
@@ -177,6 +194,8 @@ class ReportDefinitionOut(BaseModel):
     layout: list[dict[str, Any]] | None = None
     access_groups: list[str]
     status: str
+    is_live: bool = True
+    schedules: list[dict[str, Any]] | None = None
     version: int
     created_by: str | None
     created_at: dt.datetime
@@ -196,6 +215,7 @@ class ReportSummary(BaseModel):
     output_types: list[str]
     access_groups: list[str]
     status: str
+    is_live: bool = True
     last_snapshot_at: dt.datetime | None = None
     last_snapshot_status: str | None = None
 
@@ -210,6 +230,9 @@ class ReportView(BaseModel):
     layout: list[dict[str, Any]] | None = None
     columns: dict[str, Any]
     chart: dict[str, Any] | None
+    is_live: bool = True
+    schedules: list[dict[str, Any]] | None = None
+    can_manage: bool = False  # owner/admin — controls the Live toggle in the UI
     result_columns: list[str]
     rows: list[dict[str, Any]]
     row_count: int

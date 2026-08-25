@@ -1,0 +1,23 @@
+from app.platform.cache.config import settings
+from app.platform.cache.memory_cache import MemoryCache
+
+{% if redis_enabled %}
+from app.platform.cache.redis_cache import RedisCache
+{% endif %}
+
+
+_memory_cache = MemoryCache()
+
+
+def get_cache():
+    if settings.cache_backend == "memory":
+        return _memory_cache
+
+{% if redis_enabled %}
+    if settings.cache_backend == "redis":
+        if not settings.redis_url:
+            raise RuntimeError("CACHE_BACKEND=redis requires REDIS_URL to be configured.")
+        return RedisCache(settings.redis_url)
+{% endif %}
+
+    raise RuntimeError(f"Unsupported cache backend: {settings.cache_backend}")

@@ -1,0 +1,6 @@
+from app.platform.storage.blob_service import BlobService
+from app.platform.storage.config import settings
+
+
+def get_blob_service() -> BlobService:
+    return BlobService(settings.connection_string)

@@ -1,0 +1,105 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { apiFetch } from "../services/apiClient";
+
+declare global {
+  interface Window {
+    __FEATURE_SHELL_AUTH__?: {
+      version: "v1" | string;
+      isAuthenticated?: boolean;
+      userId?: string;
+      userName?: string;
+      email?: string;
+      roles?: string[];
+      accessToken?: string;
+    };
+  }
+}
+
+describe("feature auth flow integration", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    window.__FEATURE_SHELL_AUTH__ = undefined;
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    window.__FEATURE_SHELL_AUTH__ = undefined;
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+  });
+
+  it("sends bearer token when shell injects valid entra auth contract", async () => {
+    vi.stubEnv("VITE_AUTH_MODE", "entra");
+
+    window.__FEATURE_SHELL_AUTH__ = {
+      version: "v1",
+      isAuthenticated: true,
+      userId: "u1",
+      userName: "Boris",
+      email: "boris@example.com",
+      roles: ["developer"],
+      accessToken: "token-123",
+    };
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    await apiFetch("/items");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+
+    expect(headers.get("Authorization")).toBe("Bearer token-123");
+  });
+
+  it("throws before fetch when shell injects unauthenticated entra contract", async () => {
+    vi.stubEnv("VITE_AUTH_MODE", "entra");
+
+    window.__FEATURE_SHELL_AUTH__ = {
+      version: "v1",
+      isAuthenticated: false,
+      userId: "u1",
+      userName: "Boris",
+      email: "boris@example.com",
+      roles: ["developer"],
+    };
+
+    await expect(apiFetch("/items")).rejects.toThrow(
+      "Authentication is required but no shell access token was provided."
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses mock fallback when manifest/dev mode allows mock", async () => {
+    vi.stubEnv("VITE_AUTH_MODE", "mock");
+
+    window.__FEATURE_SHELL_AUTH__ = {
+      version: "v1",
+      isAuthenticated: true,
+      userId: "dev-user",
+      userName: "Local Dev User",
+      email: "dev@example.local",
+      roles: ["developer"],
+    };
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    await apiFetch("/items");
+
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+
+    expect(headers.get("X-Debug-User-Id")).toBe("dev-user");
+    expect(headers.get("X-Debug-Roles")).toBe("developer");
+  });
+});

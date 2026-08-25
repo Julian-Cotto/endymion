@@ -1,0 +1,102 @@
+{
+  "feature_name": "lead-locator",
+  "display_name": "Lead Locator",
+  "description": "Retail/site lead-generation app: enter a US zip code or city, tile the area into H3 hex cells, and score each cell for site-acquisition opportunity from modeled foot-traffic proxies (OSM POI density, road/transit access, anchor pull) plus Census ACS demographics minus competitor saturation. Renders a ranked opportunity map (MapLibre + deck.gl hex layer) with per-cell drill-down. Data sources are pluggable adapters so paid traffic feeds (Placer/SafeGraph) and parcel data drop in later without rework.",
+  "base_path": "/leads",
+  "frontend": {
+    "enabled": true,
+    "framework": "react-vite",
+    "shell_integration": true
+  },
+  "backend": {
+    "enabled": true,
+    "framework": "fastapi",
+    "api_base_path": "/api/leads"
+  },
+  "auth": {
+    "mode": "entra",
+    "shell_auth_required": true,
+    "token_forwarding": true,
+    "allowed_dev_modes": ["mock"],
+    "roles": ["lead-locator.view", "lead-locator.create", "lead-locator.admin"],
+    "backend_token_strategy": "forwarded-bearer"
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest",
+    "manifest_publish": true
+  },
+  "capabilities": {
+    "database": {
+      "enabled": true,
+      "targets": ["api", "jobs"],
+      "providers": {
+        "postgresql": { "enabled": true, "orm": true, "migrations": true },
+        "snowflake": { "enabled": false }
+      }
+    },
+    "blob_storage": { "enabled": false, "provider": "azure_blob", "targets": [] },
+    "cache": {
+      "enabled": true,
+      "targets": ["api"],
+      "providers": {
+        "memory": { "enabled": true },
+        "redis": { "enabled": false }
+      }
+    }
+  },
+  "scheduled_jobs": [
+    {
+      "name": "refresh-source-caches",
+      "description": "Refresh cached OSM POI extracts (Overpass) and Census ACS tract data for active search regions, so on-demand scoring reads warm local data instead of hitting external APIs per request.",
+      "schedule": "0 3 * * *",
+      "entrypoint": "jobs.refresh_source_caches:main"
+    }
+  ],
+  "event_driven_jobs": [
+    {
+      "name": "score-on-search",
+      "description": "When a new lead search is submitted, tile the resolved area into H3 cells, gather POI/demographic inputs, compute per-cell opportunity scores, and persist the ranked result set.",
+      "trigger": {
+        "kind": "topic-subscription",
+        "topic": "lead-locator",
+        "subscription": "score-on-search"
+      },
+      "payload_schema": "LeadSearchRequested",
+      "dead_letter": true,
+      "max_concurrency": 2,
+      "retry_policy": { "max_retries": 3, "backoff": "exponential" }
+    }
+  ],
+  "event_listeners": [],
+  "events": {
+    "publishes": [
+      { "name": "lead-locator.search-requested", "schema": "LeadSearchRequested" },
+      { "name": "lead-locator.search-scored", "schema": "LeadSearchScored" }
+    ],
+    "consumes": []
+  },
+  "deployment": {
+    "api": {
+      "enabled": true,
+      "runtime": "container-app",
+      "container_app_name": "lead-locator-api",
+      "port": 8600
+    },
+    "jobs": [
+      {
+        "name": "lead-locator-jobs",
+        "enabled": true,
+        "runtime": "container-app-job",
+        "container_app_name": "lead-locator-jobs",
+        "trigger_type": "schedule"
+      }
+    ],
+    "listeners": []
+  },
+  "developer_experience": {
+    "include_docs": true,
+    "include_tests": true,
+    "include_scripts": true
+  }
+}

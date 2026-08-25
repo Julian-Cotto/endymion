@@ -1,0 +1,71 @@
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+!.env.example.j2
+!.env.production.example
+!.env.production.example.j2
+
+# Packaging / installers
+build/
+dist/
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+share/python-wheels/
+
+# Testing & type-check / linters
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.cov-deps/
+coverage.json
+
+# Node (scaffolded frontends, local installs)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Vite / Vitest
+**/coverage/
+
+# Generator output (local scaffold runs, e.g. create --output-dir ./out)
+out/
+
+# Local archives / scratch (not part of source)
+feature-*.zip
+test_out.txt
+
+# IDE & editors
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+*.tar.gz
+
+out/ 
+out*
+
+tmp*

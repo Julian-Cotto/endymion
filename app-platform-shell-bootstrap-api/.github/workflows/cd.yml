@@ -1,0 +1,70 @@
+name: cd
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  IMAGE_NAME: shell-bootstrap-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name ${{ secrets.ACR_NAME }}
+
+      - name: Build and push image
+        run: |
+          IMAGE_TAG=${GITHUB_SHA::12}
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/${IMAGE_NAME}:${IMAGE_TAG} .
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/${IMAGE_NAME}:${IMAGE_TAG}
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        working-directory: infra
+        run: terraform init
+
+      - name: Terraform apply
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve \
+            -var "resource_group_name=${{ secrets.RESOURCE_GROUP_NAME }}" \
+            -var "location=${{ secrets.LOCATION }}" \
+            -var "container_apps_environment_id=${{ secrets.CONTAINER_APPS_ENVIRONMENT_ID }}" \
+            -var "acr_id=${{ secrets.ACR_ID }}" \
+            -var "acr_login_server=${{ secrets.ACR_LOGIN_SERVER }}" \
+            -var "registry_url=${{ secrets.REGISTRY_URL }}" \
+            -var "app_configuration_endpoint=${{ secrets.APP_CONFIGURATION_ENDPOINT }}" \
+            -var "app_configuration_id=${{ secrets.APP_CONFIGURATION_ID }}" \
+            -var "image_tag=${IMAGE_TAG}" \
+            -var "name_prefix=${{ secrets.NAME_PREFIX }}" \
+            -var "environment=${{ secrets.ENVIRONMENT }}" \
+            -var "entra_tenant_id=${{ secrets.ENTRA_TENANT_ID }}" \
+            -var "entra_audience=${{ secrets.ENTRA_AUDIENCE }}" \
+            -var "entra_issuer=${{ secrets.ENTRA_ISSUER }}" \
+            -var "cache_backend=${{ secrets.CACHE_BACKEND }}" \
+            -var "redis_url=${{ secrets.REDIS_URL }}" \
+            -var "bootstrap_include_flag_prefixes=${{ secrets.BOOTSTRAP_INCLUDE_FLAG_PREFIXES }}" \
+            -var "cors_allow_origins=${{ secrets.CORS_ALLOW_ORIGINS }}"

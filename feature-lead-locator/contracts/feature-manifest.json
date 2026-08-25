@@ -1,0 +1,83 @@
+{
+  "manifestVersion": "1.0",
+  "featureKey": "lead-locator",
+  "displayName": "Lead Locator",
+  "description": "Retail/site lead-generation app: enter a US zip code or city, tile the area into H3 hex cells, and score each cell for site-acquisition opportunity from modeled foot-traffic proxies (OSM POI density, road/transit access, anchor pull) plus Census ACS demographics minus competitor saturation. Renders a ranked opportunity map (MapLibre + deck.gl hex layer) with per-cell drill-down. Data sources are pluggable adapters so paid traffic feeds (Placer/SafeGraph) and parcel data drop in later without rework.",
+  "basePath": "/leads",
+  "route": "/leads",
+  "navigation": {
+    "label": "Lead Locator",
+    "icon": "package"
+  },
+  "nav": {
+    "label": "Lead Locator",
+    "icon": "package",
+    "group": null,
+    "order": 0
+  },
+  "version": "0.1.0",
+  "frontend": {
+    "enabled": true,
+    "type": "module",
+    "entryStrategy": "vite-dynamic-import",
+    "entryUrl": "/features/lead-locator/assets/bootstrap.js",
+    "mountFunction": "mount",
+    "integrity": null,
+    "basePath": "/leads"
+  },
+  "backend": {
+    "enabled": true,
+    "baseUrl": "/api/leads",
+    "apiBaseUrl": "/api/leads",
+    "healthEndpoint": "/api/leads/health"
+  },
+  "authorization": {
+    "requiredPermissions": [
+      "lead-locator.view"
+    ],
+    "requiredFlags": [
+      "lead-locator.enabled"
+    ]
+  },
+  "auth": {
+    "required": true,
+    "mode": "entra",
+    "shellAuthRequired": true,
+    "tokenForwarding": true,
+    "tokenStrategy": "forwarded-bearer",
+    "allowedDevModes": [
+      "mock"
+    ],
+    "roles": []
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest"
+  },
+  "compatibility": {
+    "shellContractMin": null,
+    "shellContractMax": null
+  },
+  "metadata": {
+    "ownerTeam": "platform",
+    "commitSha": null,
+    "buildId": null,
+    "releaseDate": null
+  },
+  "events": {
+    "publishes": [
+      "lead-locator.search-requested",
+      "lead-locator.search-scored"
+    ],
+    "consumes": []
+  },
+  "workers": {
+    "scheduledJobs": [
+      "refresh-source-caches"
+    ],
+    "eventDrivenJobs": [
+      "score-on-search"
+    ],
+    "eventListeners": []
+  }
+}

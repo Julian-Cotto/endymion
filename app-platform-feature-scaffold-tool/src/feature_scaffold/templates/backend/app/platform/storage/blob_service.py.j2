@@ -1,0 +1,23 @@
+from typing import Optional
+from azure.storage.blob import BlobServiceClient
+
+
+class BlobService:
+    def __init__(self, connection_string: str):
+        self.client = BlobServiceClient.from_connection_string(connection_string)
+
+    def upload_blob(self, container: str, name: str, data: bytes) -> None:
+        blob_client = self.client.get_blob_client(container=container, blob=name)
+        blob_client.upload_blob(data, overwrite=True)
+
+    def download_blob(self, container: str, name: str) -> bytes:
+        blob_client = self.client.get_blob_client(container=container, blob=name)
+        return blob_client.download_blob().readall()
+
+    def delete_blob(self, container: str, name: str) -> None:
+        blob_client = self.client.get_blob_client(container=container, blob=name)
+        blob_client.delete_blob()
+
+    def exists(self, container: str, name: str) -> bool:
+        blob_client = self.client.get_blob_client(container=container, blob=name)
+        return blob_client.exists()

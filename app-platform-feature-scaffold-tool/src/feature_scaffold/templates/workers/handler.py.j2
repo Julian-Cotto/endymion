@@ -1,0 +1,30 @@
+from .config import WorkerSettings
+from .contract import WorkerEvent
+{% if database_enabled and "jobs" in database_targets %}
+from app.runtime.database import db_session
+{% endif %}
+
+{% if blob_storage_enabled and "jobs" in blob_storage_targets %}
+from app.runtime.storage import get_blob_service
+{% endif %}
+
+{% if cache_enabled and "jobs" in cache_targets %}
+from app.runtime.cache import get_cache
+{% endif %}
+
+def handle_event(event: WorkerEvent, settings: WorkerSettings) -> None:
+    print(f"[event-worker] feature={settings.feature_key} worker={settings.worker_name} event={event.event_name} correlation_id={event.correlation_id}")
+    {% if database_enabled and "jobs" in database_targets %}
+    with db_session() as db:
+        _ = db
+    {% endif %}
+
+    {% if blob_storage_enabled and "jobs" in blob_storage_targets %}
+    blob_service = get_blob_service()
+    _ = blob_service
+    {% endif %}
+
+    {% if cache_enabled and "jobs" in cache_targets %}
+    cache = get_cache()
+    _ = cache
+    {% endif %}

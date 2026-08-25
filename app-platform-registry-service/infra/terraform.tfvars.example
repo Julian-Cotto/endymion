@@ -1,0 +1,18 @@
+resource_group_name          = "rg-portal-dev"
+location                     = "Central US"
+environment                  = "dev"
+name_prefix                  = "portal"
+
+container_apps_environment_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-portal-dev/providers/Microsoft.App/managedEnvironments/portal-cae-dev"
+acr_id                        = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-shared-dev/providers/Microsoft.ContainerRegistry/registries/portalacrdev"
+acr_login_server              = "portalacrdev.azurecr.io"
+
+registry_image_name = "portal-registry"
+registry_image_tag  = "1.0.0"
+
+allowed_frontend_hosts   = "portal-cdn.company.com"
+allowed_api_hosts        = "orders-api-dev.company.com,orders-api-test.company.com,orders-api-prod.company.com"
+shell_read_audiences     = "api://portal-registry-runtime"
+pipeline_write_audiences = "api://portal-registry-admin"
+
+database_url = "postgresql+psycopg://registry_user:replace_me@portal-pg-dev.postgres.database.azure.com:5432/registry"

@@ -1,0 +1,199 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+declare global {
+  interface Window {
+    __FEATURE_SHELL_AUTH__?: {
+      version: "v1" | string;
+      isAuthenticated?: boolean;
+      userId?: string;
+      userName?: string;
+      email?: string;
+      roles?: string[];
+      accessToken?: string;
+    };
+  }
+}
+
+vi.mock("../platform/shellContext", () => ({
+  getShellAuthContext: () => window.__FEATURE_SHELL_AUTH__,
+}));
+
+function setAuthMode(value?: string) {
+  if (value === undefined) {
+    vi.unstubAllEnvs();
+    return;
+  }
+
+  vi.stubEnv("VITE_AUTH_MODE", value);
+}
+
+describe("resolveFeatureAuthContext", () => {
+  beforeEach(() => {
+    window.__FEATURE_SHELL_AUTH__ = undefined;
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    window.__FEATURE_SHELL_AUTH__ = undefined;
+  });
+
+  it("returns anonymous authenticated context in none mode", async () => {
+    setAuthMode("none");
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx).toEqual({
+      isAuthenticated: true,
+      authMode: "none",
+      userId: "anonymous",
+      userName: "anonymous",
+      roles: [],
+    });
+  });
+
+  it("returns default dev context in mock mode when shell auth is missing", async () => {
+    setAuthMode("mock");
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx.isAuthenticated).toBe(true);
+    expect(ctx.authMode).toBe("mock");
+    expect(ctx.userId).toBe("dev-user");
+    expect(ctx.userName).toBe("Local Dev User");
+    expect(ctx.email).toBe("dev@example.local");
+    expect(ctx.roles).toEqual(["developer"]);
+    expect(ctx.accessToken).toBeUndefined();
+  });
+
+  it("uses shell auth values in mock mode when present", async () => {
+    setAuthMode("mock");
+    window.__FEATURE_SHELL_AUTH__ = {
+      version: "v1",
+      isAuthenticated: true,
+      userId: "boris",
+      userName: "Boris Moshkovich",
+      email: "boris@example.com",
+      roles: ["developer", "admin", "developer"],
+      accessToken: "dev-token",
+    };
+
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx.isAuthenticated).toBe(true);
+    expect(ctx.authMode).toBe("mock");
+    expect(ctx.userId).toBe("boris");
+    expect(ctx.userName).toBe("Boris Moshkovich");
+    expect(ctx.email).toBe("boris@example.com");
+    expect(ctx.roles).toEqual(["developer", "admin"]);
+    expect(ctx.accessToken).toBe("dev-token");
+  });
+
+  it("returns unauthenticated entra context when shell auth is missing", async () => {
+    setAuthMode("entra");
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx).toEqual({
+      isAuthenticated: false,
+      authMode: "entra",
+      roles: [],
+    });
+  });
+
+  it("returns unauthenticated entra context when shell auth exists without token", async () => {
+    setAuthMode("entra");
+    window.__FEATURE_SHELL_AUTH__ = {
+      version: "v1",
+      isAuthenticated: true,
+      userId: "boris",
+      userName: "Boris Moshkovich",
+      email: "boris@example.com",
+      roles: ["admin"],
+    };
+
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx).toEqual({
+      isAuthenticated: false,
+      authMode: "entra",
+      roles: [],
+    });
+  });
+
+  it("returns authenticated entra context when shell provides token", async () => {
+    setAuthMode("entra");
+    window.__FEATURE_SHELL_AUTH__ = {
+      version: "v1",
+      isAuthenticated: true,
+      userId: "boris",
+      userName: "Boris Moshkovich",
+      email: "boris@example.com",
+      roles: ["admin", "developer", "admin"],
+      accessToken: "real-token",
+    };
+
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx.isAuthenticated).toBe(true);
+    expect(ctx.authMode).toBe("entra");
+    expect(ctx.userId).toBe("boris");
+    expect(ctx.userName).toBe("Boris Moshkovich");
+    expect(ctx.email).toBe("boris@example.com");
+    expect(ctx.roles).toEqual(["admin", "developer"]);
+    expect(ctx.accessToken).toBe("real-token");
+  });
+
+  it("ignores invalid shell auth contract shape", async () => {
+    setAuthMode("entra");
+    window.__FEATURE_SHELL_AUTH__ = {
+      isAuthenticated: true,
+      userId: "boris",
+      accessToken: "real-token",
+    } as any;
+
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx).toEqual({
+      isAuthenticated: false,
+      authMode: "entra",
+      roles: [],
+    });
+  });
+
+  it("ignores unsupported shell auth contract version", async () => {
+    setAuthMode("entra");
+    window.__FEATURE_SHELL_AUTH__ = {
+      version: "v2",
+      isAuthenticated: true,
+      userId: "boris",
+      accessToken: "real-token",
+    } as any;
+
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx).toEqual({
+      isAuthenticated: false,
+      authMode: "entra",
+      roles: [],
+    });
+  });
+
+  it("falls back to mock when auth mode is invalid", async () => {
+    setAuthMode("something-else");
+    const { resolveFeatureAuthContext } = await import("../platform/authAdapter");
+
+    const ctx = resolveFeatureAuthContext();
+
+    expect(ctx.isAuthenticated).toBe(true);
+    expect(ctx.authMode).toBe("mock");
+    expect(ctx.userId).toBe("dev-user");
+  });
+});

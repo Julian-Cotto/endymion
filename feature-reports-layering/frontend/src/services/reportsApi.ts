@@ -52,6 +52,14 @@ export function refreshDefinition(slug: string): Promise<ReportDefinition> {
   );
 }
 
+/** Toggle whether a report is visible beyond its owner (owner/admin only). */
+export function setLive(slug: string, is_live: boolean): Promise<ReportDefinition> {
+  return apiPost<ReportDefinition>(
+    `${BASE}/definitions/${encodeURIComponent(slug)}/live`,
+    { is_live },
+  );
+}
+
 /** Dry-run: real columns + sample rows for an unsaved definition. */
 export function previewDefinition(
   input: ReportDefinitionInput,

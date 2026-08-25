@@ -1,0 +1,87 @@
+{
+  "feature_name": "billing",
+  "display_name": "Billing",
+  "description": "Billing background processing feature",
+  "base_path": "/billing",
+  "frontend": {
+    "enabled": false,
+    "framework": "react-vite",
+    "shell_integration": false
+  },
+  "backend": {
+    "enabled": true,
+    "framework": "fastapi",
+    "api_base_path": "/api/billing"
+  },
+  "auth": {
+    "mode": "mock",
+    "shell_auth_required": true,
+    "token_forwarding": true,
+    "allowed_dev_modes": ["mock"],
+    "roles": ["admin", "developer", "operator"],
+    "backend_token_strategy": "forwarded-bearer"
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest",
+    "manifest_publish": true
+  },
+  "scheduled_jobs": [
+    {
+      "name": "invoice-rollup",
+      "description": "Roll up invoice totals",
+      "schedule": "0 1 * * *"
+    }
+  ],
+  "event_driven_jobs": [
+    {
+      "name": "process-payment",
+      "description": "Process payment events",
+      "trigger": {
+        "kind": "topic-subscription",
+        "topic": "billing",
+        "subscription": "process-payment"
+      },
+      "payload_schema": "ProcessPaymentRequested",
+      "dead_letter": true,
+      "max_concurrency": 3,
+      "retry_policy": {
+        "max_retries": 5,
+        "backoff": "exponential"
+      }
+    }
+  ],
+  "event_listeners": [],
+  "events": {
+    "publishes": [
+      {
+        "name": "billing.payment-processed",
+        "schema": "PaymentProcessed"
+      }
+    ],
+    "consumes": [
+      {
+        "name": "billing.payment-requested",
+        "schema": "ProcessPaymentRequested"
+      }
+    ]
+  },
+  "deployment": {
+    "api": {
+      "container_app_name": "billing-api",
+      "port": 8000
+    },
+    "jobs": [
+      {
+        "name": "billing-jobs",
+        "container_app_name": "billing-jobs"
+      }
+    ],
+    "listeners": []
+  },
+  "developer_experience": {
+    "include_docs": true,
+    "include_tests": true,
+    "include_scripts": true
+  }
+}

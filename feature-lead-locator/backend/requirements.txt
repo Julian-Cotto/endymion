@@ -1,0 +1,18 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+httpx
+PyJWT[crypto]
+jsonschema>=4.22.0
+
+sqlalchemy
+psycopg2-binary
+alembic
+
+# Geospatial: PostGIS column types, H3 hex tiling, geometry construction
+GeoAlchemy2
+h3>=4.0
+shapely
+
+

@@ -1,0 +1,6 @@
+from .blob_service import BlobService
+from .config import settings
+
+
+def get_blob_service() -> BlobService:
+    return BlobService(settings.connection_string)

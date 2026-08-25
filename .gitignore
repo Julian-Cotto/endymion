@@ -55,3 +55,10 @@ ngrok.yml
 .DS_Store
 Thumbs.db
 .claude/
+
+# --- captures / data exports (never commit; may carry auth headers or PII) ---
+*.har
+*.csv
+
+# --- vendored coverage deps (absorbed from scaffold-tool; kept in its fork) ---
+.cov-deps/

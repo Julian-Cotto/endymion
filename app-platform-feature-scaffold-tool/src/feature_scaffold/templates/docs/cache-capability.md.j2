@@ -1,0 +1,45 @@
+# Cache capability
+
+This feature includes cache support.
+
+{% if memory_cache_enabled %}
+## Memory cache
+
+The feature can use in-process memory cache for local and single-instance scenarios.
+{% endif %}
+
+{% if redis_enabled %}
+## Redis cache
+
+The feature can use Redis for shared, distributed caching.
+
+### Required environment variables
+
+REDIS_URL=redis://localhost:6379/0
+
+### Cache backend selection
+
+CACHE_BACKEND=redis
+{% else %}
+## Cache backend selection
+
+CACHE_BACKEND=memory
+{% endif %}
+
+## Main files
+
+- `backend/app/platform/cache/config.py`
+- `backend/app/platform/cache/memory_cache.py`
+- `backend/app/platform/cache/cache_factory.py`
+
+{% if redis_enabled %}
+- `backend/app/platform/cache/redis_cache.py`
+{% endif %}
+
+## Runtime usage
+
+### API
+- `backend/app/platform/cache/dependencies.py`
+
+### Jobs / listeners
+- `backend/app/runtime/cache.py`

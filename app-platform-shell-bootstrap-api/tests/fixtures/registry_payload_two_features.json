@@ -1,0 +1,64 @@
+{
+    "features": [
+      {
+        "featureKey": "orders",
+        "displayName": "Orders",
+        "route": "/orders",
+        "version": "1.0.0",
+        "nav": {
+          "label": "Orders",
+          "icon": "package"
+        },
+        "frontend": {
+          "enabled": true,
+          "entryUrl": "http://localhost:3200/src/bootstrap-entry.tsx",
+          "mountFunction": "mount"
+        },
+        "backend": {
+          "enabled": true,
+          "apiBaseUrl": "http://localhost:8100/api/orders",
+          "healthEndpoint": "/health"
+        },
+        "authorization": {
+          "requiredPermissions": ["orders.view"],
+          "requiredFlags": ["orders.enabled"]
+        },
+        "auth": {
+          "required": true,
+          "mode": "mock",
+          "shellAuthRequired": true,
+          "tokenForwarding": false
+        }
+      },
+      {
+        "featureKey": "catalog",
+        "displayName": "Catalog",
+        "route": "/catalog",
+        "version": "1.0.0",
+        "nav": {
+          "label": "Catalog",
+          "icon": "boxes"
+        },
+        "frontend": {
+          "enabled": true,
+          "entryUrl": "http://localhost:3300/src/bootstrap-entry.tsx",
+          "mountFunction": "mount"
+        },
+        "backend": {
+          "enabled": true,
+          "apiBaseUrl": "http://localhost:8200/api/catalog",
+          "healthEndpoint": "/health"
+        },
+        "authorization": {
+          "requiredPermissions": ["catalog.view"],
+          "requiredFlags": ["catalog.enabled"]
+        },
+        "auth": {
+          "required": true,
+          "mode": "mock",
+          "shellAuthRequired": true,
+          "tokenForwarding": false
+        }
+      }
+    ]
+  }

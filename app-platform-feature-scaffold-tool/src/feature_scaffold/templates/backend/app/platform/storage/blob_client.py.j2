@@ -1,0 +1,6 @@
+class BlobClient:
+    def __init__(self, connection_string: str):
+        self.connection_string = connection_string
+
+    def upload(self, name: str, data: bytes):
+        raise NotImplementedError("Upload not implemented")

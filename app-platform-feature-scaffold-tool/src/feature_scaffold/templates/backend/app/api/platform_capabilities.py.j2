@@ -1,0 +1,39 @@
+from fastapi import APIRouter
+
+{% if database_enabled and "api" in database_targets %}
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from app.platform.database.dependencies import get_db
+{% endif %}
+
+{% if blob_storage_enabled and "api" in blob_storage_targets %}
+from app.platform.storage.dependencies import get_blob_service
+from app.platform.storage.blob_service import BlobService
+{% endif %}
+
+router = APIRouter(tags=["platform"])
+
+
+@router.get("/platform/capabilities")
+def get_platform_capabilities(
+{% if database_enabled and "api" in database_targets %}
+    db: Session = Depends(get_db),
+{% endif %}
+{% if blob_storage_enabled and "api" in blob_storage_targets %}
+    blob_service: BlobService = Depends(get_blob_service),
+{% endif %}
+):
+    response = {
+        "databaseEnabled": {{ "true" if database_enabled else "false" }},
+        "blobStorageEnabled": {{ "true" if blob_storage_enabled else "false" }},
+    }
+
+{% if database_enabled and "api" in database_targets %}
+    response["databaseDependency"] = db is not None
+{% endif %}
+
+{% if blob_storage_enabled and "api" in blob_storage_targets %}
+    response["blobServiceDependency"] = blob_service is not None
+{% endif %}
+
+    return response

@@ -1,15 +1,3 @@
-[submodule "app-platform-feature-scaffold-tool"]
-	path = app-platform-feature-scaffold-tool
-	url = github.com-work:Julian-Cotto/endymion-feature-scaffold-tool.git
-[submodule "app-platform-registry-service"]
-	path = app-platform-registry-service
-	url = github.com-work:Julian-Cotto/endymion-registry-service.git
-[submodule "app-platform-shell"]
-	path = app-platform-shell
-	url = github.com-work:Julian-Cotto/endymion-shell.git
-[submodule "app-platform-shell-bootstrap-api"]
-	path = app-platform-shell-bootstrap-api
-	url = github.com-work:Julian-Cotto/endymion-bootstrap-api.git
 [submodule "feature-asset-inventory-backend"]
 	path = feature-asset-inventory-backend
 	url = github.com-work:Julian-Cotto/feature-asset-inventory-backend.git
@@ -25,3 +13,9 @@
 [submodule "app-platform-snowflake-client"]
 	path = app-platform-snowflake-client
 	url = github.com-work:Julian-Cotto/endymion-snowflake-client.git
+[submodule "document-compliance-backend"]
+	path = document-compliance-backend
+	url = github.com-work:Julian-Cotto/feature-document-compliance-backend.git
+[submodule "document-compliance-frontend"]
+	path = document-compliance-frontend
+	url = github.com-work:Julian-Cotto/feature-document-compliance-frontend.git

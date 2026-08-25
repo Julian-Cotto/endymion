@@ -1,0 +1,20 @@
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class WorkerSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="[[ names.feature_key | replace('-', '_') | upper ]]_", extra="ignore")
+    feature_key: str = "[[ names.feature_key ]]"
+    worker_name: str = "[[ target_name ]]"
+    trigger_kind: str = "[[ trigger_kind ]]"
+    topic_name: str = "[[ trigger_topic ]]"
+    subscription_name: str = "[[ trigger_subscription ]]"
+    queue_name: str = "[[ trigger_queue ]]"
+    event_name: str = "[[ target_event_name ]]"
+    dead_letter_enabled: bool = [[ "True" if dead_letter else "False" ]]
+    max_concurrency: int = [[ max_concurrency ]]
+    max_retries: int = [[ max_retries ]]
+    retry_backoff: str = "[[ retry_backoff ]]"
+
+@lru_cache(maxsize=1)
+def get_worker_settings() -> WorkerSettings:
+    return WorkerSettings()

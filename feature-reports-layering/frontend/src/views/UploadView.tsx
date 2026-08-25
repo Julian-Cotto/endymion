@@ -15,12 +15,14 @@ import type {
   ParamSpec,
   PreviewResult,
   ReportDefinitionInput,
+  ScheduleEntry,
   SourceInput,
 } from "../types/reports";
 import type { ReportView } from "../types/reports";
 import { navigate } from "../hooks/useHashRoute";
 import { useToast } from "../components/Toast";
 import { LayoutEditor } from "../components/reports/LayoutEditor";
+import { ScheduleEditor } from "../components/reports/ScheduleEditor";
 import { ReportRenderer } from "../components/reports/ReportRenderer";
 import { SourceEditor } from "../components/reports/SourceEditor";
 import { ExpandableTextarea } from "../components/reports/ExpandableTextarea";
@@ -74,6 +76,8 @@ export function UploadView({ slug }: { slug?: string } = {}) {
   const [meta, setMeta] = useState(TEMPLATE);
   const [outputs, setOutputs] = useState<OutputType[]>(["table"]);
   const [layout, setLayout] = useState<LayoutBlock[]>([]);
+  const [isLive, setIsLive] = useState(true);
+  const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [status, setStatus] = useState<ReportDefinitionInput["status"]>("active");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -170,6 +174,8 @@ export function UploadView({ slug }: { slug?: string } = {}) {
         setOutputs((d.output_types?.length ? d.output_types : ["table"]) as OutputType[]);
         setStatus(d.status as ReportDefinitionInput["status"]);
         setLayout((d.layout as LayoutBlock[]) ?? []);
+        setIsLive(d.is_live ?? true);
+        setSchedules((d.schedules as ScheduleEntry[]) ?? []);
         setMeta(
           JSON.stringify(
             { columns: d.columns ?? {}, chart: d.chart ?? null, params: d.params ?? {} },
@@ -192,6 +198,8 @@ export function UploadView({ slug }: { slug?: string } = {}) {
     meta,
     outputs,
     layout,
+    isLive,
+    schedules,
     status,
     sourceMode,
     sources,
@@ -275,6 +283,8 @@ export function UploadView({ slug }: { slug?: string } = {}) {
       params: (parsedMeta.params as never) ?? {},
       chart: (parsedMeta.chart as never) ?? null,
       layout: layout.length ? layout : null,
+      is_live: isLive,
+      schedules,
     };
     if (sourceMode === "sources") {
       input.sources = sources;
@@ -591,6 +601,32 @@ export function UploadView({ slug }: { slug?: string } = {}) {
         <span className="rl-hint">
           Leave blank to make the report visible to all viewers.
         </span>
+      </div>
+
+      <div className="rl-field">
+        <label>Visibility</label>
+        <label className="rl-live-toggle">
+          <input
+            type="checkbox"
+            checked={isLive}
+            onChange={(e) => setIsLive(e.target.checked)}
+          />
+          <span>
+            <strong>{isLive ? "Live" : "Private"}</strong> —{" "}
+            {isLive
+              ? "visible to others per the access groups above"
+              : "only you (the owner) and admins can see it"}
+          </span>
+        </label>
+      </div>
+
+      <div className="rl-field">
+        <label>Schedules</label>
+        <span className="rl-hint" style={{ marginBottom: 8 }}>
+          Saved refresh schedules. These are stored and editable, but nothing
+          runs them automatically yet.
+        </span>
+        <ScheduleEditor value={schedules} onChange={setSchedules} />
       </div>
 
       <div className="rl-field">

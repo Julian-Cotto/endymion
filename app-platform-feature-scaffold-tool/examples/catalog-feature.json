@@ -1,0 +1,49 @@
+{
+  "feature_name": "catalog",
+  "display_name": "Catalog",
+  "description": "Catalog feature",
+  "base_path": "/catalog",
+  "frontend": {
+    "enabled": true,
+    "framework": "react-vite",
+    "shell_integration": true
+  },
+  "backend": {
+    "enabled": true,
+    "framework": "fastapi",
+    "api_base_path": "/api/catalog"
+  },
+  "auth": {
+    "mode": "entra",
+    "shell_auth_required": true,
+    "token_forwarding": true,
+    "allowed_dev_modes": ["mock"],
+    "roles": [],
+    "backend_token_strategy": "forwarded-bearer"
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest",
+    "manifest_publish": true
+  },
+  "scheduled_jobs": [],
+  "event_driven_jobs": [],
+  "event_listeners": [],
+  "events": {
+    "publishes": [],
+    "consumes": []
+  },
+  "deployment": {
+    "api": {
+      "container_app_name": "catalog-api",
+      "port": 8000
+    },
+    "jobs": [],
+    "listeners": []
+  },
+  "developer_experience": {
+    "include_docs": true,
+    "include_tests": true,
+    "include_scripts": true
+  }
+}

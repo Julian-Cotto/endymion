@@ -1,0 +1,425 @@
+# Lead Locator Runbook
+
+## Purpose
+
+This runbook explains how to operate, validate, troubleshoot, and support the `Lead Locator` feature.
+
+---
+
+## Platform Context
+
+Runtime flow:
+
+```text
+Shell
+  → Bootstrap API
+  → Registry Service
+  → Lead Locator Feature
+```
+
+The feature is discovered dynamically through Registry and Bootstrap.
+
+---
+
+## Local Startup
+
+### 1. Start platform services
+
+Start these first:
+
+```text
+Registry Service
+Bootstrap API
+Shell
+```
+
+Typical local ports:
+
+```text
+Shell             :3000
+Bootstrap API     :8001
+Registry          :8010
+```
+
+---
+
+### 2. Bootstrap this feature
+
+```bash
+./scripts/bootstrap.sh
+```
+
+---
+
+### 3. Start this feature
+
+```bash
+./scripts/run-local.sh
+```
+
+Expected behavior:
+
+```text
+backend starts
+frontend starts
+manifest renders
+manifest validates
+release publishes to registry
+release activates in registry
+Bootstrap returns the feature for authorized users
+Shell displays the feature dynamically
+```
+
+---
+
+## Health Checks
+
+Backend health:
+
+```bash
+curl http://localhost:<backend-port>/api/leads/health
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "featureKey": "lead-locator"
+}
+```
+
+---
+
+## Authorization Model
+
+This feature follows the platform convention:
+
+```text
+Entra app role value = platform permission
+```
+
+Examples:
+
+```text
+lead-locator.view
+lead-locator.create
+lead-locator.edit
+lead-locator.manage
+platform.admin
+```
+
+The backend does not use local role-permission mappings.
+
+---
+
+## Local Authorization Testing
+
+Local mock mode:
+
+```env
+AUTH_MODE=mock
+AUTH_DEFAULT_DEV_ROLES_RAW=lead-locator.view
+AUTH_DEBUG_HEADERS_ENABLED=true
+```
+
+Test allowed access:
+
+```bash
+curl \
+  -H "X-Debug-Roles: lead-locator.view" \
+  http://localhost:<backend-port>/api/leads/items
+```
+
+Expected:
+
+```text
+200 OK
+```
+
+Test denied access:
+
+```bash
+curl \
+  -H "X-Debug-Roles: other.view" \
+  http://localhost:<backend-port>/api/leads/items
+```
+
+Expected:
+
+```text
+403 Forbidden
+```
+
+Test admin access:
+
+```bash
+curl \
+  -H "X-Debug-Roles: platform.admin" \
+  http://localhost:<backend-port>/api/leads/items
+```
+
+Expected:
+
+```text
+200 OK
+```
+
+---
+
+## Production Authorization
+
+Production mode:
+
+```env
+APP_ENVIRONMENT=production
+AUTH_MODE=entra
+AUTH_DEBUG_HEADERS_ENABLED=false
+```
+
+Required Entra token behavior:
+
+```json
+{
+  "roles": [
+    "lead-locator.view"
+  ]
+}
+```
+
+Debug headers are rejected in production.
+
+---
+
+## Registry Validation
+
+Confirm the feature was published:
+
+```bash
+curl http://localhost:8010/api/runtime/features?environment=local
+```
+
+The feature should appear only after activation.
+
+Expected lifecycle:
+
+```text
+POST /api/releases
+POST /api/releases/{releaseId}/activate
+GET /api/runtime/features
+```
+
+---
+
+## Bootstrap Validation
+
+Call Bootstrap runtime endpoint:
+
+```bash
+curl \
+  -H "X-Debug-Roles: lead-locator.view" \
+  http://localhost:8001/api/runtime/features
+```
+
+Expected:
+
+```text
+Feature appears in response
+```
+
+Without permission:
+
+```bash
+curl \
+  -H "X-Debug-Roles: other.view" \
+  http://localhost:8001/api/runtime/features
+```
+
+Expected:
+
+```text
+Feature does not appear
+```
+
+---
+
+## Common Issues
+
+### Feature does not appear in Shell
+
+Check:
+
+```text
+Registry is running
+Feature was published
+Feature was activated
+Bootstrap can reach registry
+User has required permission
+Required feature flag is enabled
+Shell runtime endpoint returns the feature
+```
+
+---
+
+### Registry returns empty features
+
+Likely causes:
+
+```text
+No active release
+Feature published but not activated
+Wrong environment value
+Registry running against different local state
+```
+
+Fix:
+
+```text
+Run ./scripts/run-local.sh again
+Confirm activation step succeeded
+Check Registry local storage/database
+```
+
+---
+
+### Bootstrap returns empty features
+
+Likely causes:
+
+```text
+User missing required permission
+Required flag disabled
+Bootstrap cannot reach Registry
+Manifest authorization block is incorrect
+```
+
+Fix:
+
+```text
+Check X-Debug-Roles or token roles claim
+Check requiredPermissions in manifest
+Check Bootstrap logs
+Check Registry runtime response directly
+```
+
+---
+
+### Backend returns 403
+
+Likely causes:
+
+```text
+AUTH_DEFAULT_DEV_ROLES_RAW does not include lead-locator.view
+X-Debug-Roles missing required permission
+AUTH_REQUIRED_PERMISSIONS_RAW differs from endpoint expectation
+Token roles claim missing expected role
+```
+
+Fix:
+
+```bash
+curl \
+  -H "X-Debug-Roles: lead-locator.view" \
+  http://localhost:<backend-port>/api/leads/items
+```
+
+---
+
+### Backend rejects debug headers
+
+This is expected when:
+
+```env
+AUTH_MODE=entra
+```
+
+Debug identity headers are only allowed in mock/local development.
+
+---
+
+### Token validates but access is denied
+
+Check that the token contains:
+
+```json
+{
+  "roles": ["lead-locator.view"]
+}
+```
+
+Do not rely on:
+
+```text
+scp
+access_as_user
+```
+
+Scopes validate API access. Roles grant business permissions.
+
+---
+
+## Log Review
+
+Review backend logs for:
+
+```text
+auth_context_created_mock
+auth_context_created_entra
+auth_entra_missing_bearer_token
+auth_entra_invalid_audience
+auth_entra_invalid_issuer
+auth_entra_invalid_token
+auth_entra_debug_headers_rejected
+```
+
+---
+
+## Safe Restart
+
+Restart order:
+
+```text
+1. Registry
+2. Bootstrap API
+3. Feature backend/frontend
+4. Shell
+```
+
+For local development, rerun:
+
+```bash
+./scripts/run-local.sh
+```
+
+---
+
+## Operational Checks
+
+Before marking the feature healthy:
+
+```text
+backend health returns ok
+frontend loads directly
+manifest validates
+registry has active release
+Bootstrap returns feature for authorized user
+Shell displays feature
+protected backend endpoint returns 200 for authorized user
+protected backend endpoint returns 403 for unauthorized user
+```
+
+---
+
+## Definition of Done
+
+Operational readiness requires:
+
+```text
+local startup documented
+health check works
+registry publish + activate works
+Bootstrap visibility works
+Shell loads dynamically
+backend permission enforcement works
+tests pass
+```

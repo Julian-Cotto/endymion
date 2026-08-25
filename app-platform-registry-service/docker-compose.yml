@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: portal-registry-db
+    environment:
+      POSTGRES_DB: portal_registry
+      POSTGRES_USER: registry
+      POSTGRES_PASSWORD: registry
+    ports:
+      - "5433:5432"
+    volumes:
+      - portal_registry_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U registry -d portal_registry"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  portal_registry_pgdata:

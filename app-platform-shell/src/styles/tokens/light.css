@@ -1,0 +1,30 @@
+:root,
+[data-theme="light"] {
+  /* Channel-only RGB so Tailwind can compose alpha via rgb(var(--x) / <alpha-value>) */
+  --color-bg: 249 250 251;
+  --color-surface: 255 255 255;
+  --color-surface-muted: 243 244 246;
+  --color-text: 17 24 39;
+  --color-text-muted: 107 114 128;
+  --color-border: 229 231 235;
+
+  --color-primary: 37 99 235;
+  --color-primary-fg: 255 255 255;
+  --color-primary-soft: 239 246 255;
+  --color-primary-soft-fg: 29 78 216;
+
+  --color-danger: 220 38 38;
+  --color-danger-fg: 255 255 255;
+  --color-danger-soft: 254 242 242;
+  --color-danger-soft-fg: 185 28 28;
+
+  --color-success: 22 163 74;
+  --color-success-fg: 255 255 255;
+  --color-success-soft: 240 253 244;
+  --color-success-soft-fg: 21 128 61;
+
+  --color-warning: 217 119 6;
+  --color-warning-fg: 255 255 255;
+  --color-warning-soft: 255 251 235;
+  --color-warning-soft-fg: 180 83 9;
+}

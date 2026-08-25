@@ -1,0 +1,63 @@
+{
+  "environment": "dev",
+  "user": {
+    "id": "dev-user",
+    "displayName": "Developer",
+    "email": "dev@example.com"
+  },
+  "permissions": [
+    "[[ names.feature_key ]].view"
+  ],
+  "flags": {
+    "shell.debug": true,
+    "[[ names.feature_key ]].enabled": true
+  },
+  "features": [
+    {
+      "featureKey": "[[ names.feature_key ]]",
+      "displayName": "[[ names.display_name ]]",
+      "route": "[[ names.base_path ]]",
+      "version": "1.0.0",
+      "nav": {
+        "label": "[[ names.display_name ]]",
+        "icon": "box",
+        "group": null,
+        "order": null
+      },
+      "frontend": {
+        "enabled": true,
+        "entryStrategy": "vite-dynamic-import",
+        "entryUrl": "[[ names.base_path ]]/src/bootstrap-entry.tsx",
+        "mountFunction": "mount"
+      },
+      "backend": {
+        "enabled": true,
+        "apiBaseUrl": "[[ names.api_base_path ]]",
+        "healthEndpoint": "/health"
+      },
+      "authorization": {
+        "requiredPermissions": [
+          "[[ names.feature_key ]].view"
+        ],
+        "requiredFlags": [
+          "[[ names.feature_key ]].enabled"
+        ]
+      },
+      "auth": {
+        "mode": "shell-provided",
+        "required": true,
+        "shellAuthRequired": true,
+        "tokenForwarding": true,
+        "allowedDevModes": [
+          "mock"
+        ],
+        "roles": []
+      }
+    }
+  ],
+  "metadata": {
+    "source": "bootstrap-service-registry",
+    "generatedBy": "shell-bootstrap-api",
+    "generatedAtUtc": "2026-05-04T00:00:00Z"
+  }
+}

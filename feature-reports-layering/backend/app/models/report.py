@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -57,6 +59,14 @@ class ReportDefinition(Base):
     combine: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    # Live == visible beyond its owner (per access_groups). When false the
+    # report is private: only the owner (created_by) and admins can see it.
+    is_live: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("1"), default=True
+    )
+    # Saved schedule entries [{cadence, time, day_of_week, day_of_month, cron,
+    # label, enabled}]. UI-only for now — nothing executes these yet.
+    schedules: Mapped[list | None] = mapped_column(JSON, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
 

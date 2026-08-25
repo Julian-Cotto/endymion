@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Launch platform services only:
 #   registry-service          :8010
-#   shell-bootstrap-api       :8000
+#   shell-bootstrap-api       :8765
 #   shell                     :3000
 #
 # Usage:
@@ -26,8 +26,8 @@ SVC_BOOTSTRAP[registry]="python"
 SVC_ENV_FROM_EXAMPLE[registry]=1
 
 SVC_DIR[bootstrap]="$ROOT/app-platform-shell-bootstrap-api"
-SVC_CMD[bootstrap]='.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000'
-SVC_HEALTH[bootstrap]="http://localhost:8000/api/shell/health"
+SVC_CMD[bootstrap]='.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8765'
+SVC_HEALTH[bootstrap]="http://localhost:8765/api/shell/health"
 SVC_HEALTH_TIMEOUT[bootstrap]=60
 SVC_BOOTSTRAP[bootstrap]="python"
 SVC_ENV_FROM_EXAMPLE[bootstrap]=1
@@ -39,7 +39,7 @@ SVC_HEALTH_TIMEOUT[shell]=90
 SVC_BOOTSTRAP[shell]="node"
 SVC_ENV_FROM_EXAMPLE[shell]=1
 
-PORTS=(8010 8000 3000)
+PORTS=(8010 8765 3000)
 
 source "$ROOT/scripts/_run_lib.sh"
 parse_common_args "$@"

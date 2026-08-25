@@ -1,0 +1,8 @@
+from pydantic_settings import BaseSettings
+
+
+class BlobStorageSettings(BaseSettings):
+    connection_string: str = "UseDevelopmentStorage=true"
+
+
+settings = BlobStorageSettings()

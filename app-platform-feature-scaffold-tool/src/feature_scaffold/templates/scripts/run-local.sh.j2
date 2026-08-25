@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+VENV_DIR="$ROOT_DIR/.venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+VENV_PIP="$VENV_DIR/bin/pip"
+
+BACKEND_DIR="$ROOT_DIR/backend"
+FRONTEND_DIR="$ROOT_DIR/frontend"
+BUILD_DIR="$ROOT_DIR/build"
+
+BACKEND_PORT="${BACKEND_PORT:-[[ ports.backend_port ]]}"
+FRONTEND_PORT="${FRONTEND_PORT:-[[ ports.frontend_port ]]}"
+BOOTSTRAP_PORT="${BOOTSTRAP_PORT:-[[ ports.bootstrap_port ]]}"
+BOOTSTRAP_HEALTH_PATH="${BOOTSTRAP_HEALTH_PATH:-/bootstrap}"
+
+REGISTRY_BASE_URL="${REGISTRY_BASE_URL:-http://localhost:8010}"
+PUBLISH_LOCAL_ENABLED="${PUBLISH_LOCAL_ENABLED:-true}"
+
+BACKEND_PID=""
+FRONTEND_PID=""
+BOOTSTRAP_PID=""
+
+log() {
+  echo "[run-local] $*"
+}
+
+warn() {
+  echo "[run-local][warn] $*" >&2
+}
+
+err() {
+  echo "[run-local][error] $*" >&2
+}
+
+cleanup() {
+  log "Stopping local services..."
+
+  if [ -n "$BACKEND_PID" ]; then
+    kill "$BACKEND_PID" >/dev/null 2>&1 || true
+  fi
+
+  if [ -n "$FRONTEND_PID" ]; then
+    kill "$FRONTEND_PID" >/dev/null 2>&1 || true
+  fi
+
+  if [ -n "$BOOTSTRAP_PID" ]; then
+    kill "$BOOTSTRAP_PID" >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup EXIT
+
+require_cmd() {
+  local cmd="$1"
+
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    err "Required command not found: $cmd"
+    exit 1
+  fi
+}
+
+ensure_venv() {
+  if [ ! -x "$VENV_PYTHON" ]; then
+    err "Virtual environment Python not found at $VENV_PYTHON"
+    err "Run ./scripts/bootstrap.sh before ./scripts/run-local.sh"
+    exit 1
+  fi
+
+  if [ ! -x "$VENV_PIP" ]; then
+    err "Virtual environment pip not found at $VENV_PIP"
+    err "Run ./scripts/bootstrap.sh before ./scripts/run-local.sh"
+    exit 1
+  fi
+}
+
+ensure_python_module() {
+  local module_name="$1"
+
+  if "$VENV_PYTHON" -c "import ${module_name}" >/dev/null 2>&1; then
+    return
+  fi
+
+  warn "Python module '${module_name}' is missing from .venv."
+  warn "Reinstalling backend dependencies..."
+
+  if [ -f "$BACKEND_DIR/pyproject.toml" ]; then
+    (
+      cd "$BACKEND_DIR"
+      "$VENV_PIP" install -e ".[dev]"
+    )
+  elif [ -f "$ROOT_DIR/pyproject.toml" ]; then
+    (
+      cd "$ROOT_DIR"
+      "$VENV_PIP" install -e ".[dev]"
+    )
+  elif [ -f "$BACKEND_DIR/requirements.txt" ]; then
+    "$VENV_PIP" install -r "$BACKEND_DIR/requirements.txt"
+  else
+    err "No backend dependency file found."
+    exit 1
+  fi
+
+  "$VENV_PYTHON" -c "import ${module_name}" >/dev/null 2>&1 || {
+    err "Python module '${module_name}' is still missing after reinstall."
+    err "Check backend/pyproject.toml or backend/requirements.txt."
+    exit 1
+  }
+}
+
+wait_for_http() {
+  local url="$1"
+  local name="$2"
+
+  for _ in {1..40}; do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      log "$name is ready: $url"
+      return
+    fi
+
+    sleep 0.5
+  done
+
+  warn "$name did not become ready at $url"
+}
+
+start_backend() {
+  if [ ! -d "$BACKEND_DIR" ]; then
+    warn "Backend directory not found; skipping backend startup."
+    return
+  fi
+
+  log "Starting backend on port $BACKEND_PORT..."
+
+  (
+    cd "$BACKEND_DIR"
+    "$VENV_PYTHON" -m uvicorn app.main:app \
+      --host 0.0.0.0 \
+      --port "$BACKEND_PORT"
+  ) &
+
+  BACKEND_PID="$!"
+
+  wait_for_http "http://localhost:$BACKEND_PORT[[ names.api_base_path ]]/health" "Backend"
+}
+
+start_frontend() {
+  if [ ! -d "$FRONTEND_DIR" ]; then
+    warn "Frontend directory not found; skipping frontend startup."
+    return
+  fi
+
+  require_cmd npm
+
+  log "Starting frontend on port $FRONTEND_PORT..."
+
+  (
+    cd "$FRONTEND_DIR"
+    npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
+  ) &
+
+  FRONTEND_PID="$!"
+
+  wait_for_http "http://localhost:$FRONTEND_PORT" "Frontend"
+}
+
+start_bootstrap_mock() {
+  if [ ! -f "$ROOT_DIR/scripts/serve-bootstrap-mock.py" ]; then
+    warn "Bootstrap mock script not found; skipping feature-local bootstrap mock."
+    return
+  fi
+
+  log "Starting feature-local bootstrap mock on port $BOOTSTRAP_PORT..."
+
+  (
+    cd "$ROOT_DIR"
+    "$VENV_PYTHON" scripts/serve-bootstrap-mock.py \
+      --host 0.0.0.0 \
+      --port "$BOOTSTRAP_PORT"
+  ) &
+
+  BOOTSTRAP_PID="$!"
+
+  wait_for_http "http://localhost:${BOOTSTRAP_PORT}${BOOTSTRAP_HEALTH_PATH}" "Feature-local bootstrap mock"
+}
+
+render_manifest() {
+  mkdir -p "$BUILD_DIR"
+
+  log "Rendering manifest..."
+
+  "$VENV_PYTHON" "$ROOT_DIR/scripts/render-manifest.py" \
+    --output "$BUILD_DIR/feature-manifest.resolved.json" \
+    --frontend-url "http://localhost:$FRONTEND_PORT/src/bootstrap-entry.tsx" \
+    --backend-url "http://localhost:$BACKEND_PORT[[ names.api_base_path ]]"
+
+  log "Resolved manifest written to $BUILD_DIR/feature-manifest.resolved.json"
+}
+
+validate_manifest() {
+  log "Validating manifest..."
+
+  ensure_python_module jsonschema
+
+  "$VENV_PYTHON" "$ROOT_DIR/scripts/validate-manifest.py" \
+    "$BUILD_DIR/feature-manifest.resolved.json" \
+    "$ROOT_DIR/manifest.schema.json"
+}
+
+publish_local() {
+  if [ "$PUBLISH_LOCAL_ENABLED" != "true" ]; then
+    log "Local registry publish disabled."
+    return
+  fi
+
+  if [ ! -f "$ROOT_DIR/scripts/render-registry-payload.py" ]; then
+    warn "Registry payload renderer not found; skipping publish."
+    return
+  fi
+
+  log "Rendering registry payload..."
+
+  "$VENV_PYTHON" "$ROOT_DIR/scripts/render-registry-payload.py" \
+    --manifest "$BUILD_DIR/feature-manifest.resolved.json" \
+    --environment local \
+    --frontend-url "http://localhost:$FRONTEND_PORT/src/bootstrap-entry.tsx" \
+    --backend-url "http://localhost:$BACKEND_PORT[[ names.api_base_path ]]" \
+    --output "$BUILD_DIR/registry-payload.json"
+
+  log "Publishing local release to registry..."
+
+  release_response="$(
+    curl -fsS \
+      -H "Content-Type: application/json" \
+      -X POST \
+      --data @"$BUILD_DIR/registry-payload.json" \
+      "$REGISTRY_BASE_URL/api/releases"
+  )"
+
+  release_id="$(
+    printf '%s' "$release_response" | "$VENV_PYTHON" -c '
+import json
+import sys
+
+payload = json.loads(sys.stdin.read())
+print(payload.get("id") or payload.get("releaseId") or "")
+'
+  )"
+
+  if [ -z "$release_id" ]; then
+    warn "Registry publish response did not include release id."
+    warn "$release_response"
+    return
+  fi
+
+  log "Published release: $release_id"
+  log "Activating local release..."
+
+  curl -fsS \
+    -H "Content-Type: application/json" \
+    -X POST \
+    "$REGISTRY_BASE_URL/api/admin/features/[[ names.feature_key ]]/versions/[[ manifest_version ]]/activate?environment=local" >/dev/null
+
+  log "Activated release: $release_id"
+}
+
+log "Starting [[ names.display_name ]] locally..."
+log "Root directory: $ROOT_DIR"
+
+require_cmd curl
+require_cmd "$PYTHON_BIN"
+ensure_venv
+
+start_backend
+start_frontend
+start_bootstrap_mock
+
+render_manifest
+validate_manifest
+
+if ! publish_local; then
+  warn "Local registry publish failed. Feature services are still running."
+  warn "Check that registry is running at $REGISTRY_BASE_URL."
+fi
+
+echo
+log "Local services started."
+log "Backend:   http://localhost:$BACKEND_PORT"
+log "Bootstrap: http://localhost:${BOOTSTRAP_PORT}${BOOTSTRAP_HEALTH_PATH}"
+log "Frontend:  http://localhost:$FRONTEND_PORT"
+log "Registry:  $REGISTRY_BASE_URL"
+log "Publish:   PUBLISH_LOCAL_ENABLED=$PUBLISH_LOCAL_ENABLED"
+log "Shell runs separately."
+log "Press Ctrl+C to stop."
+
+while true; do
+  sleep 1
+done

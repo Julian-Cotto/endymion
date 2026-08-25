@@ -1,0 +1,37 @@
+{% if postgres_enabled %}
+## Database Layer
+
+- SQLAlchemy ORM
+- Alembic migrations
+- Dependency injection for API
+- Shared usage across API, jobs, listeners
+{% endif %}
+
+{% if snowflake_enabled %}
+## Snowflake Layer
+
+Snowflake integration for analytics workloads.
+{% endif %}
+
+{% if blob_storage_enabled %}
+## Storage Layer
+
+- Azure Blob Storage integration
+- Shared client across all runtimes
+{% endif %}
+
+{% if cache_enabled %}
+## Cache Layer
+
+This feature includes a cache layer.
+
+{% if memory_cache_enabled %}
+- In-memory cache support
+{% endif %}
+{% if redis_enabled %}
+- Redis cache support
+{% endif %}
+- Shared cache factory
+- API dependency wiring
+- Runtime helpers for jobs and listeners
+{% endif %}

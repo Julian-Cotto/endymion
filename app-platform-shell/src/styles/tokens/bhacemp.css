@@ -1,0 +1,37 @@
+/* Bhacemp dashboard theme — deep navy surfaces, teal primary, mockup
+   alert-card warning/danger/success tones. Channel-only RGB so Tailwind
+   alpha modifiers (e.g. bg-primary/40) keep working. */
+
+[data-theme="bhacemp"] {
+  /* Surfaces — charcoal with subtle blue undertone (was too saturated navy) */
+  --color-bg: 12 14 24;            /* #0c0e18 — near-black w/ blue hint */
+  --color-surface: 24 27 40;       /* #181b28 — card */
+  --color-surface-muted: 36 40 56; /* #242838 — raised / hover */
+  --color-text: 232 236 242;       /* #e8ecf2 — slightly cool white */
+  --color-text-muted: 139 145 163; /* #8b91a3 — neutral gray */
+  --color-border: 42 47 64;        /* #2a2f40 — subtle separator */
+
+  /* Primary — brighter cyan-teal matching mockup's "Exploit" tile */
+  --color-primary: 20 224 196;            /* #14e0c4 */
+  --color-primary-fg: 8 21 38;            /* dark text on teal */
+  --color-primary-soft: 12 49 49;         /* deep teal-tinted surface */
+  --color-primary-soft-fg: 94 234 212;    /* light teal text */
+
+  /* Danger — magenta/pink (Phishing) */
+  --color-danger: 230 73 141;             /* #e6498d */
+  --color-danger-fg: 255 255 255;
+  --color-danger-soft: 70 19 49;
+  --color-danger-soft-fg: 249 168 212;
+
+  /* Success — distinct cyan-teal, slightly different from primary */
+  --color-success: 27 216 192;            /* #1bd8c0 */
+  --color-success-fg: 6 36 27;
+  --color-success-soft: 6 50 41;
+  --color-success-soft-fg: 110 231 183;
+
+  /* Warning — saturated orange (Malware) */
+  --color-warning: 240 128 37;            /* #f08025 */
+  --color-warning-fg: 28 25 23;
+  --color-warning-soft: 66 32 6;
+  --color-warning-soft-fg: 252 211 77;
+}

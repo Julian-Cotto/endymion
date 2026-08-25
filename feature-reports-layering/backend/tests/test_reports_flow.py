@@ -361,3 +361,57 @@ def test_prune_orphan_uploads(client):
         headers=_hdr(AUTHOR),
     )
     assert r_keep.status_code == 201, r_keep.text
+
+
+AUTHOR_NONADMIN = "reports-layering.create,reports-layering.view"
+
+
+def test_live_visibility_and_schedules(client):
+    owner = _hdr(AUTHOR_NONADMIN, user="owner@example.local")
+    payload = {
+        "title": "Private Draft Report",
+        "sql_text": "SELECT region, COUNT(*) AS n FROM t GROUP BY region",
+        "columns": {"region": {"label": "Region"}, "n": {"format": "int"}},
+        "output_types": ["table"],
+        "access_groups": [],
+        "is_live": False,
+        "schedules": [{"cadence": "daily", "time": "08:00", "label": "Morning"}],
+    }
+    r = client.post(f"{API}/definitions", json=payload, headers=owner)
+    assert r.status_code == 201, r.text
+    slug = r.json()["slug"]
+    assert r.json()["is_live"] is False
+    assert r.json()["schedules"][0]["cadence"] == "daily"
+
+    # Owner sees it (and can_manage on the view).
+    v = client.get(f"{API}/reports/{slug}", headers=owner)
+    assert v.status_code == 200
+    assert v.json()["is_live"] is False and v.json()["can_manage"] is True
+
+    # A different viewer cannot see a private report — 404, absent from list.
+    viewer = _hdr(VIEWER, user="someone@example.local")
+    assert client.get(f"{API}/reports/{slug}", headers=viewer).status_code == 404
+    assert slug not in [x["slug"] for x in client.get(f"{API}/reports", headers=viewer).json()]
+
+    # A different (non-admin) author also cannot see it.
+    other_author = _hdr(AUTHOR_NONADMIN, user="other@example.local")
+    assert client.get(f"{API}/reports/{slug}", headers=other_author).status_code == 404
+
+    # Owner flips it live -> now visible to viewers (no access groups = public).
+    r = client.post(f"{API}/definitions/{slug}/live", json={"is_live": True}, headers=owner)
+    assert r.status_code == 200 and r.json()["is_live"] is True
+    vv = client.get(f"{API}/reports/{slug}", headers=viewer)
+    assert vv.status_code == 200
+    assert vv.json()["can_manage"] is False  # viewer can't manage
+
+
+def test_non_owner_cannot_toggle_live(client):
+    owner = _hdr(AUTHOR_NONADMIN, user="owner2@example.local")
+    r = client.post(
+        f"{API}/definitions",
+        json={"title": "Owned Report", "sql_text": "SELECT a FROM t", "output_types": ["table"]},
+        headers=owner,
+    )
+    slug = r.json()["slug"]
+    other = _hdr(AUTHOR_NONADMIN, user="intruder@example.local")
+    assert client.post(f"{API}/definitions/{slug}/live", json={"is_live": False}, headers=other).status_code == 403

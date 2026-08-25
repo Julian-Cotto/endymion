@@ -1,0 +1,7 @@
+from .config import WorkerSettings
+from .contract import WorkerEvent
+from .handler import handle_event
+
+def test_handle_event_executes_without_error() -> None:
+    settings = WorkerSettings(feature_key="[[ names.feature_key ]]", worker_name="[[ target_name ]]", trigger_kind="[[ trigger_kind ]]", topic_name="[[ trigger_topic ]]", subscription_name="[[ trigger_subscription ]]", queue_name="[[ trigger_queue ]]", event_name="[[ target_event_name ]]", dead_letter_enabled=[[ "True" if dead_letter else "False" ]], max_concurrency=[[ max_concurrency ]], max_retries=[[ max_retries ]], retry_backoff="[[ retry_backoff ]]")
+    handle_event(WorkerEvent(event_name="[[ target_event_name ]]", payload={"sample": True}, correlation_id="test"), settings)

@@ -1,0 +1,86 @@
+name: registry-release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_NAME: portal-registry
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run basic import checks
+        run: |
+          python -c "from app.main import app; print(app.title)"
+
+      - name: Azure login using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: |
+          az acr login --name ${{ secrets.ACR_NAME }}
+
+      - name: Build and push image
+        env:
+          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+        run: |
+          chmod +x scripts/build_image.sh
+          ./scripts/build_image.sh
+
+      - name: Terraform deploy
+        env:
+          TF_VAR_resource_group_name: ${{ secrets.RESOURCE_GROUP_NAME }}
+          TF_VAR_location: ${{ secrets.LOCATION }}
+          TF_VAR_environment: ${{ secrets.ENVIRONMENT }}
+          TF_VAR_name_prefix: ${{ secrets.NAME_PREFIX }}
+          TF_VAR_container_apps_environment_id: ${{ secrets.CONTAINER_APPS_ENVIRONMENT_ID }}
+          TF_VAR_acr_id: ${{ secrets.ACR_ID }}
+          TF_VAR_acr_login_server: ${{ secrets.ACR_LOGIN_SERVER }}
+          TF_VAR_registry_image_name: portal-registry
+          TF_VAR_registry_image_tag: ${{ github.sha }}
+          TF_VAR_allowed_frontend_hosts: ${{ secrets.ALLOWED_FRONTEND_HOSTS }}
+          TF_VAR_allowed_api_hosts: ${{ secrets.ALLOWED_API_HOSTS }}
+          TF_VAR_shell_read_audiences: ${{ secrets.SHELL_READ_AUDIENCES }}
+          TF_VAR_pipeline_write_audiences: ${{ secrets.PIPELINE_WRITE_AUDIENCES }}
+          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+        run: |
+          chmod +x scripts/deploy_registry.sh
+          ./scripts/deploy_registry.sh
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          chmod +x scripts/run_migrations.sh
+          ./scripts/run_migrations.sh
+
+      - name: Smoke test
+        env:
+          REGISTRY_BASE_URL: ${{ secrets.REGISTRY_BASE_URL }}
+        run: |
+          chmod +x scripts/smoke_test.sh
+          ./scripts/smoke_test.sh

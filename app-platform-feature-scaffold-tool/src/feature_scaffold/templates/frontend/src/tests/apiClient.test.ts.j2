@@ -1,0 +1,190 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { apiFetch } from "../services/apiClient";
+import type { FeatureAuthContext } from "../platform/authTypes";
+
+vi.mock("../platform/authAdapter", () => ({
+  resolveFeatureAuthContext: vi.fn(),
+}));
+
+import { resolveFeatureAuthContext } from "../platform/authAdapter";
+
+const mockedResolveFeatureAuthContext = vi.mocked(resolveFeatureAuthContext);
+
+function buildAuthContext(
+  overrides: Partial<FeatureAuthContext> = {}
+): FeatureAuthContext {
+  return {
+    isAuthenticated: true,
+    authMode: "mock",
+    userId: "dev-user",
+    userName: "Local Dev User",
+    email: "dev@example.local",
+    roles: ["developer"],
+    ...overrides,
+  };
+}
+
+describe("apiFetch", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it("adds debug headers in mock mode", async () => {
+    mockedResolveFeatureAuthContext.mockReturnValue(
+      buildAuthContext({
+        authMode: "mock",
+        userId: "boris",
+        userName: "Boris Moshkovich",
+        email: "boris@example.com",
+        roles: ["admin", "developer"],
+      })
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    await apiFetch("/items");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/items");
+
+    const headers = new Headers(init?.headers);
+    expect(headers.get("X-Debug-User-Id")).toBe("boris");
+    expect(headers.get("X-Debug-User-Name")).toBe("Boris Moshkovich");
+    expect(headers.get("X-Debug-Email")).toBe("boris@example.com");
+    expect(headers.get("X-Debug-Roles")).toBe("admin,developer");
+    expect(headers.get("Authorization")).toBeNull();
+  });
+
+  it("adds authorization header in entra mode", async () => {
+    mockedResolveFeatureAuthContext.mockReturnValue(
+      buildAuthContext({
+        authMode: "entra",
+        isAuthenticated: true,
+        accessToken: "real-token",
+        roles: ["developer"],
+      })
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    await apiFetch("/items");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+
+    expect(headers.get("Authorization")).toBe("Bearer real-token");
+    expect(headers.get("X-Debug-User-Id")).toBeNull();
+    expect(headers.get("X-Debug-Roles")).toBeNull();
+  });
+
+  it("throws before fetch when entra mode is unauthenticated", async () => {
+    mockedResolveFeatureAuthContext.mockReturnValue({
+      isAuthenticated: false,
+      authMode: "entra",
+      roles: [],
+    });
+
+    await expect(apiFetch("/items")).rejects.toThrow(
+      "Authentication is required but no shell access token was provided."
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("throws unauthorized error on 401", async () => {
+    mockedResolveFeatureAuthContext.mockReturnValue(
+      buildAuthContext({
+        authMode: "entra",
+        isAuthenticated: true,
+        accessToken: "real-token",
+      })
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Unauthorized" }), { status: 401 })
+    );
+
+    await expect(apiFetch("/items")).rejects.toThrow(
+      "Request was rejected as unauthorized."
+    );
+  });
+
+  it("throws forbidden error on 403", async () => {
+    mockedResolveFeatureAuthContext.mockReturnValue(
+      buildAuthContext({
+        authMode: "entra",
+        isAuthenticated: true,
+        accessToken: "real-token",
+      })
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Forbidden" }), { status: 403 })
+    );
+
+    await expect(apiFetch("/items")).rejects.toThrow(
+      "Request was rejected as forbidden."
+    );
+  });
+
+  it("preserves custom headers", async () => {
+    mockedResolveFeatureAuthContext.mockReturnValue(
+      buildAuthContext({
+        authMode: "mock",
+        userId: "boris",
+        userName: "Boris",
+        roles: ["developer"],
+      })
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    await apiFetch("/items", {
+      headers: {
+        "X-Custom-Header": "custom-value",
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+
+    expect(headers.get("X-Custom-Header")).toBe("custom-value");
+    expect(headers.get("X-Debug-User-Id")).toBe("boris");
+  });
+
+  it("normalizes path when slash is missing", async () => {
+    mockedResolveFeatureAuthContext.mockReturnValue(
+      buildAuthContext({
+        authMode: "mock",
+      })
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    await apiFetch("items");
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toContain("/items");
+  });
+});

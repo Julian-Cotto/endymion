@@ -1,0 +1,61 @@
+{
+  "featureKey": "orders",
+  "displayName": "Orders",
+  "description": "Orders management feature",
+  "basePath": "/orders",
+  "route": "/orders",
+  "navigation": {
+    "label": "Orders",
+    "icon": "package"
+  },
+  "nav": {
+    "label": "Orders",
+    "icon": "package"
+  },
+  "version": "1.0.0",
+  "environment": "local",
+  "frontend": {
+    "enabled": true,
+    "entryStrategy": "vite-dynamic-import",
+    "entryUrl": "http://localhost:3200/src/bootstrap-entry.tsx",
+    "mountFunction": "mount"
+  },
+  "backend": {
+    "enabled": true,
+    "baseUrl": "http://localhost:8100/api/orders",
+    "apiBaseUrl": "http://localhost:8100/api/orders",
+    "healthEndpoint": "http://localhost:8100/api/orders/health"
+  },
+  "authorization": {
+    "requiredPermissions": ["orders.view"],
+    "requiredFlags": ["orders.enabled"]
+  },
+  "auth": {
+    "required": true,
+    "mode": "entra",
+    "shellAuthRequired": true,
+    "tokenForwarding": true,
+    "tokenStrategy": "forwarded-bearer",
+    "allowedDevModes": ["mock"],
+    "roles": ["admin", "developer", "reader", "operator"]
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest"
+  },
+  "events": {
+    "publishes": ["orders.created"],
+    "consumes": ["inventory.reserved"]
+  },
+  "workers": {
+    "scheduledJobs": ["nightly-reconciliation"],
+    "eventDrivenJobs": ["submit-order"],
+    "eventListeners": ["inventory-reserved"]
+  },
+  "metadata": {
+    "ownerTeam": "platform",
+    "commitSha": null,
+    "buildId": null,
+    "releaseDate": null
+  }
+}

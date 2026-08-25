@@ -1,0 +1,30 @@
+from .config import ListenerSettings
+from .contract import ListenerEvent
+{% if database_enabled and "listeners" in database_targets %}
+from app.runtime.database import db_session
+{% endif %}
+
+{% if blob_storage_enabled and "listeners" in blob_storage_targets %}
+from app.runtime.storage import get_blob_service
+{% endif %}
+
+{% if cache_enabled and "listeners" in cache_targets %}
+from app.runtime.cache import get_cache
+{% endif %}
+
+def handle_listener_event(event: ListenerEvent, settings: ListenerSettings) -> None:
+    print(f"[event-listener] feature={settings.feature_key} listener={settings.listener_name} event={event.event_name} correlation_id={event.correlation_id}")
+    {% if database_enabled and "listeners" in database_targets %}
+    with db_session() as db:
+        _ = db
+    {% endif %}
+
+    {% if blob_storage_enabled and "listeners" in blob_storage_targets %}
+    blob_service = get_blob_service()
+    _ = blob_service
+    {% endif %}
+
+    {% if cache_enabled and "listeners" in cache_targets %}
+    cache = get_cache()
+    _ = cache
+    {% endif %}

@@ -84,6 +84,18 @@ export interface LayoutBlock {
   text?: string; // for type "note"
 }
 
+export type Cadence = "hourly" | "daily" | "weekly" | "monthly" | "cron";
+
+export interface ScheduleEntry {
+  cadence: Cadence;
+  time?: string | null; // "HH:MM"
+  day_of_week?: number | null; // 0=Mon
+  day_of_month?: number | null; // 1–31
+  cron?: string | null;
+  label?: string | null;
+  enabled?: boolean;
+}
+
 export interface ReportSummary {
   slug: string;
   title: string;
@@ -91,6 +103,7 @@ export interface ReportSummary {
   output_types: OutputType[];
   access_groups: string[];
   status: string;
+  is_live?: boolean;
   last_snapshot_at: string | null;
   last_snapshot_status: string | null;
 }
@@ -103,6 +116,9 @@ export interface ReportView {
   layout?: LayoutBlock[] | null;
   columns: Record<string, ColumnConfig>;
   chart: ChartConfig | null;
+  is_live?: boolean;
+  schedules?: ScheduleEntry[] | null;
+  can_manage?: boolean;
   result_columns: string[];
   rows: Array<Record<string, unknown>>;
   row_count: number;
@@ -125,6 +141,8 @@ export interface ReportDefinitionInput {
   layout?: LayoutBlock[] | null;
   access_groups?: string[];
   status?: "active" | "draft" | "archived";
+  is_live?: boolean;
+  schedules?: ScheduleEntry[];
 }
 
 export interface SourceOut {
@@ -136,7 +154,7 @@ export interface SourceOut {
   sort_order: number;
 }
 
-export interface ReportDefinition extends ReportDefinitionInput {
+export interface ReportDefinition extends Omit<ReportDefinitionInput, "sources"> {
   id: number;
   slug: string;
   sql_text?: string; // nullable server-side; empty string when source-based

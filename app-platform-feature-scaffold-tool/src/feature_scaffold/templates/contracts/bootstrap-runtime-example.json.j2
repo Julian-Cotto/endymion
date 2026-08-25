@@ -1,0 +1,43 @@
+{
+  "environment": "local",
+  "user": {
+    "id": "local-dev",
+    "displayName": "Local Developer",
+    "email": "dev@local"
+  },
+  "permissions": [
+    "[[ names.feature_key ]].view"
+  ],
+  "flags": {
+    "shell.debug": true,
+    "[[ names.feature_key ]].enabled": true
+  },
+  "features": [
+    {
+      "featureKey": "[[ names.feature_key ]]",
+      "displayName": "[[ names.display_name ]]",
+      "route": "[[ names.base_path ]]",
+      "version": "local",
+      "nav": {
+        "label": "[[ names.display_name ]]",
+        "icon": "box",
+        "group": null,
+        "order": null
+      },
+      "frontend": {
+        "entryUrl": "http://localhost:[[ ports.frontend_port ]]/src/bootstrap-entry.tsx"
+      },
+      "backend": {
+        "apiBaseUrl": "http://localhost:[[ ports.backend_port ]][[ names.api_base_path ]]"
+      },
+      "authorization": {
+        "requiredPermissions": [
+          "[[ names.feature_key ]].view"
+        ],
+        "requiredFlags": [
+          "[[ names.feature_key ]].enabled"
+        ]
+      }
+    }
+  ]
+}

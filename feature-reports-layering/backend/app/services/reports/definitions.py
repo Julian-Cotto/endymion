@@ -89,6 +89,8 @@ def create_definition(
         layout=[b.model_dump() for b in payload.layout] if payload.layout else None,
         access_groups=list(payload.access_groups),
         status=payload.status,
+        is_live=payload.is_live,
+        schedules=[s.model_dump() for s in payload.schedules] if payload.schedules else None,
         created_by=created_by,
         sources=_source_rows(payload.sources),
     )
@@ -117,6 +119,8 @@ def update_definition(
     defn.layout = [b.model_dump() for b in payload.layout] if payload.layout else None
     defn.access_groups = list(payload.access_groups)
     defn.status = payload.status
+    defn.is_live = payload.is_live
+    defn.schedules = [s.model_dump() for s in payload.schedules] if payload.schedules else None
     defn.version += 1
     # Replace sources wholesale; delete-orphan cleans up the old rows.
     defn.sources = _source_rows(payload.sources)

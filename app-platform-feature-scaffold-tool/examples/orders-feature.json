@@ -1,0 +1,132 @@
+{
+  "feature_name": "orders",
+  "display_name": "Orders",
+  "description": "Orders management feature",
+  "base_path": "/orders",
+  "frontend": {
+    "enabled": true,
+    "framework": "react-vite",
+    "shell_integration": true
+  },
+  "backend": {
+    "enabled": true,
+    "framework": "fastapi",
+    "api_base_path": "/api/orders"
+  },
+  "auth": {
+    "mode": "entra",
+    "shell_auth_required": true,
+    "token_forwarding": true,
+    "allowed_dev_modes": ["mock"],
+    "roles": [],
+    "backend_token_strategy": "forwarded-bearer"
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest",
+    "manifest_publish": true
+  },
+  "scheduled_jobs": [
+    {
+      "name": "nightly-reconciliation",
+      "description": "Reconcile orders nightly",
+      "schedule": "0 2 * * *"
+    }
+  ],
+  "event_driven_jobs": [
+    {
+      "name": "submit-order",
+      "description": "Process submitted orders asynchronously",
+      "trigger": {
+        "kind": "topic-subscription",
+        "topic": "orders",
+        "subscription": "submit-order"
+      },
+      "payload_schema": "SubmitOrderRequested",
+      "dead_letter": true,
+      "max_concurrency": 4,
+      "retry_policy": {
+        "max_retries": 5,
+        "backoff": "exponential"
+      }
+    }
+  ],
+  "event_listeners": [
+    {
+      "name": "inventory-reserved",
+      "description": "Handle inventory reservation events",
+      "event_name": "inventory.reserved",
+      "payload_schema": "InventoryReserved"
+    }
+  ],
+  "events": {
+    "publishes": [
+      {
+        "name": "orders.created",
+        "schema": "OrderCreated"
+      }
+    ],
+    "consumes": [
+      {
+        "name": "inventory.reserved",
+        "schema": "InventoryReserved"
+      }
+    ]
+  },
+  "capabilities": {
+    "database": {
+      "enabled": true,
+      "targets": ["api", "jobs", "listeners"],
+      "providers": {
+        "postgresql": {
+          "enabled": true,
+          "orm": true,
+          "migrations": true
+        },
+        "snowflake": {
+          "enabled": true
+        }
+      }
+    },
+    "blob_storage": {
+      "enabled": true,
+      "provider": "azure_blob",
+      "targets": ["api", "jobs"]
+    },
+    "cache": {
+      "enabled": true,
+      "targets": ["api", "jobs", "listeners"],
+      "providers": {
+        "memory": {
+          "enabled": false
+        },
+        "redis": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "deployment": {
+    "api": {
+      "container_app_name": "orders-api",
+      "port": 8000
+    },
+    "jobs": [
+      {
+        "name": "orders-jobs",
+        "container_app_name": "orders-jobs"
+      }
+    ],
+    "listeners": [
+      {
+        "name": "orders-listeners",
+        "container_app_name": "orders-listeners"
+      }
+    ]
+  },
+  "developer_experience": {
+    "include_docs": true,
+    "include_tests": true,
+    "include_scripts": true
+  }
+}

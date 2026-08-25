@@ -1,0 +1,11 @@
+# Events Contract
+
+## Publishes
+{% for event in published_events %}
+- `[[ event.name ]]` (schema: `[[ event.schema ]]`)
+{% endfor %}
+
+## Consumes
+{% for event in consumed_events %}
+- `[[ event.name ]]` (schema: `[[ event.schema ]]`)
+{% endfor %}

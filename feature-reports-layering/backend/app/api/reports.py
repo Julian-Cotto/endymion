@@ -4,6 +4,7 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_auth_context
@@ -67,6 +68,7 @@ def _summary(db: Session, defn: ReportDefinition) -> ReportSummary:
         output_types=defn.output_types,
         access_groups=defn.access_groups,
         status=defn.status,
+        is_live=defn.is_live,
         last_snapshot_at=snap.run_at if snap else None,
         last_snapshot_status=snap.status if snap else None,
     )
@@ -115,6 +117,9 @@ def get_report(
         layout=defn.layout,
         columns=defn.columns,
         chart=defn.chart,
+        is_live=defn.is_live,
+        schedules=defn.schedules,
+        can_manage=access.can_manage(defn, ctx),
         result_columns=snap.result_columns if snap else [],
         rows=snap.row_data if snap else [],
         row_count=snap.row_count if snap else 0,
@@ -247,6 +252,29 @@ def update_definition(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     snapshots.refresh_snapshot(db, defn)
     reports_events.report_published(defn, actor=ctx.email or ctx.user_id)
+    return _definition_out(db, defn)
+
+
+class LiveToggle(BaseModel):
+    is_live: bool
+
+
+@router.post("/definitions/{slug}/live", response_model=ReportDefinitionOut)
+def set_live(
+    slug: str,
+    body: LiveToggle,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(require_author),
+):
+    """Toggle whether the report is visible beyond its owner. Owner/admin only."""
+    defn = definitions.get_by_slug(db, slug)
+    if defn is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if not access.can_manage(defn, ctx):
+        raise HTTPException(status_code=403, detail="Only the owner or an admin can change visibility.")
+    defn.is_live = body.is_live
+    db.commit()
+    db.refresh(defn)
     return _definition_out(db, defn)
 
 

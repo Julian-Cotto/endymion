@@ -93,6 +93,11 @@ export function BrowseView({ canAuthor = false }: { canAuthor?: boolean }) {
                   : "No data yet"}
               </div>
               <div className="rl-tagrow">
+                {r.is_live === false && (
+                  <span className="rl-tag" style={{ color: "var(--rl-warn)" }}>
+                    private
+                  </span>
+                )}
                 {r.output_types.map((t) => (
                   <span className="rl-tag" key={t}>
                     {t}

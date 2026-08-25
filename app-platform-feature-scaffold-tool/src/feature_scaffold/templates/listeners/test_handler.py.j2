@@ -1,0 +1,7 @@
+from .config import ListenerSettings
+from .contract import ListenerEvent
+from .handler import handle_listener_event
+
+def test_handle_listener_event_executes_without_error() -> None:
+    settings = ListenerSettings(feature_key="[[ names.feature_key ]]", listener_name="[[ target_name ]]", event_name="[[ target_event_name ]]", payload_schema="[[ payload_schema ]]")
+    handle_listener_event(ListenerEvent(event_name="[[ target_event_name ]]", payload={"sample": True}, correlation_id="test"), settings)

@@ -1,0 +1,23 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+httpx
+PyJWT[crypto]
+jsonschema>=4.22.0
+
+{% if database_enabled %}
+sqlalchemy
+psycopg2-binary
+{% if postgres_enabled and postgres_migrations_enabled %}
+alembic
+{% endif %}
+{% endif %}
+
+{% if blob_storage_enabled %}
+azure-storage-blob
+{% endif %}
+
+{% if redis_enabled %}
+redis
+{% endif %}

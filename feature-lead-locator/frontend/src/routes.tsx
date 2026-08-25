@@ -1,0 +1,1 @@
+export const featureRoutes = [{ path: "/leads", label: "Lead Locator" }];

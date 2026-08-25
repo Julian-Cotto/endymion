@@ -1,0 +1,71 @@
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+
+client = TestClient(app)
+
+
+def test_health():
+    response = client.get("[[ names.api_base_path ]]/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["featureKey"] == "[[ names.feature_key ]]"
+
+
+def test_me_allowed_with_default_mock_role(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "mock")
+    monkeypatch.setenv("AUTH_DEBUG_HEADERS_ENABLED", "true")
+    monkeypatch.setenv("AUTH_DEFAULT_DEV_ROLES_RAW", "[[ names.feature_key ]].view")
+    monkeypatch.setenv("AUTH_REQUIRED_PERMISSIONS_RAW", "[[ names.feature_key ]].view")
+
+    response = client.get("[[ names.api_base_path ]]/me")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["isAuthenticated"] is True
+    assert "[[ names.feature_key ]].view" in body["roles"]
+
+
+def test_items_allowed_with_debug_role(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "mock")
+    monkeypatch.setenv("AUTH_DEBUG_HEADERS_ENABLED", "true")
+    monkeypatch.setenv("AUTH_REQUIRED_PERMISSIONS_RAW", "[[ names.feature_key ]].view")
+
+    response = client.get(
+        "[[ names.api_base_path ]]/items",
+        headers={
+            "X-Debug-Roles": "[[ names.feature_key ]].view",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["featureKey"] == "[[ names.feature_key ]]"
+
+
+def test_items_denied_without_required_permission(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "mock")
+    monkeypatch.setenv("AUTH_DEBUG_HEADERS_ENABLED", "true")
+    monkeypatch.setenv("AUTH_DEFAULT_DEV_ROLES_RAW", "other.view")
+    monkeypatch.setenv("AUTH_REQUIRED_PERMISSIONS_RAW", "[[ names.feature_key ]].view")
+
+    response = client.get("[[ names.api_base_path ]]/items")
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["message"] == "Insufficient permissions"
+    assert response.json()["detail"]["requiredPermissions"] == [
+        "[[ names.feature_key ]].view"
+    ]
+
+
+def test_items_allowed_with_platform_admin(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "mock")
+    monkeypatch.setenv("AUTH_DEBUG_HEADERS_ENABLED", "true")
+    monkeypatch.setenv("AUTH_DEFAULT_DEV_ROLES_RAW", "platform.admin")
+    monkeypatch.setenv("AUTH_REQUIRED_PERMISSIONS_RAW", "[[ names.feature_key ]].view")
+
+    response = client.get("[[ names.api_base_path ]]/items")
+
+    assert response.status_code == 200
+    assert response.json()["featureKey"] == "[[ names.feature_key ]]"

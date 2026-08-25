@@ -1,0 +1,49 @@
+{
+  "feature_name": "public-portal",
+  "display_name": "Public Portal",
+  "description": "Public-facing portal feature",
+  "base_path": "/public",
+  "frontend": {
+    "enabled": true,
+    "framework": "react-vite",
+    "shell_integration": true
+  },
+  "backend": {
+    "enabled": true,
+    "framework": "fastapi",
+    "api_base_path": "/api/public"
+  },
+  "auth": {
+    "mode": "none",
+    "shell_auth_required": false,
+    "token_forwarding": false,
+    "allowed_dev_modes": ["none", "mock"],
+    "roles": [],
+    "backend_token_strategy": "none"
+  },
+  "registry": {
+    "enabled": true,
+    "mode": "rest",
+    "manifest_publish": true
+  },
+  "scheduled_jobs": [],
+  "event_driven_jobs": [],
+  "event_listeners": [],
+  "events": {
+    "publishes": [],
+    "consumes": []
+  },
+  "deployment": {
+    "api": {
+      "container_app_name": "public-portal-api",
+      "port": 8000
+    },
+    "jobs": [],
+    "listeners": []
+  },
+  "developer_experience": {
+    "include_docs": true,
+    "include_tests": true,
+    "include_scripts": true
+  }
+}

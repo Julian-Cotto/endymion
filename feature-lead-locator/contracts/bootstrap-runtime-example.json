@@ -1,0 +1,43 @@
+{
+  "environment": "local",
+  "user": {
+    "id": "local-dev",
+    "displayName": "Local Developer",
+    "email": "dev@local"
+  },
+  "permissions": [
+    "lead-locator.view"
+  ],
+  "flags": {
+    "shell.debug": true,
+    "lead-locator.enabled": true
+  },
+  "features": [
+    {
+      "featureKey": "lead-locator",
+      "displayName": "Lead Locator",
+      "route": "/leads",
+      "version": "local",
+      "nav": {
+        "label": "Lead Locator",
+        "icon": "box",
+        "group": null,
+        "order": null
+      },
+      "frontend": {
+        "entryUrl": "http://localhost:3200/src/bootstrap-entry.tsx"
+      },
+      "backend": {
+        "apiBaseUrl": "http://localhost:8100/api/leads"
+      },
+      "authorization": {
+        "requiredPermissions": [
+          "lead-locator.view"
+        ],
+        "requiredFlags": [
+          "lead-locator.enabled"
+        ]
+      }
+    }
+  ]
+}
